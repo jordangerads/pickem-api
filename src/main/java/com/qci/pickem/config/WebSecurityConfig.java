@@ -1,4 +1,4 @@
-package com.quadglacier.pickem.hello;
+package com.qci.pickem.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
