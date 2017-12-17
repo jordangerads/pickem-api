@@ -3,6 +3,8 @@ package com.qci.pickem.model;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
@@ -25,9 +27,9 @@ public enum NflTeams {
     PHILADELPHIA_EAGLES("PHI", "Eagles", "Philadelphia Eagles"),
     WASHINGTON_REDSKINS("WAS", "Redskins", "Washington Redskins"),
 
-    // NFC West SEA, SF, ARI, LAR
+    // NFC West
     ARIZONA_CARDINALS("ARI", "Cardinals", "Arizona Cardinals"),
-    LOS_ANGELES_RAMS("LAR", "Rams", "Los Angeles Rams"),
+    LOS_ANGELES_RAMS("LA", "Rams", "Los Angeles Rams", "STL"), // Should be LAR!
     SAN_FRANCISCO_49ERS("SF", "49ers", "San Francisco 49ers"),
     SEATTLE_SEAHAWKS("SEA", "Seahawks", "Seattle Seahawks"),
 
@@ -52,19 +54,30 @@ public enum NflTeams {
     // AFC West
     DENVER_BRONCOS("DEN", "Broncos", "Denver Broncos"),
     KANSAS_CITY_CHIEFS("KC", "Chiefs", "Kansas City Chiefs"),
-    LOS_ANGELES_CHARGERS("LAC", "Chargers", "Los Angeles Chargers"),
-    OAKLAND_RAIDERS("OAK", "Raiders", "Oakland Raiders");
+    LOS_ANGELES_CHARGERS("LAC", "Chargers", "Los Angeles Chargers", "SD"),
+    OAKLAND_RAIDERS("OAK", "Raiders", "Oakland Raiders"),
+
+    // Need an other for exceptional cases
+    UNKNOWN("UNK", "Unknown", "Unknown");
 
     private final String displayCode;
     private final String shortName;
     private final String fullName;
+    private final String priorCode;
 
     private static final Map<String, NflTeams> TEAMS_BY_CODE;
+
+    private static final Logger log = LoggerFactory.getLogger(NflTeams.class);
 
     static {
         ImmutableMap.Builder<String, NflTeams> builder = ImmutableMap.builder();
 
-        Lists.newArrayList(NflTeams.values()).forEach(nflTeam -> builder.put(nflTeam.displayCode, nflTeam));
+        Lists.newArrayList(NflTeams.values()).forEach(nflTeam -> {
+            builder.put(nflTeam.displayCode, nflTeam);
+            if (StringUtils.isNotBlank(nflTeam.priorCode)) {
+                builder.put(nflTeam.priorCode, nflTeam);
+            }
+        });
 
         TEAMS_BY_CODE = builder.build();
     }
@@ -73,6 +86,14 @@ public enum NflTeams {
         this.displayCode = displayCode;
         this.shortName = shortName;
         this.fullName = fullName;
+        this.priorCode = null;
+    }
+
+    NflTeams(String displayCode, String shortName, String fullName, String priorCode) {
+        this.displayCode = displayCode;
+        this.shortName = shortName;
+        this.fullName = fullName;
+        this.priorCode = priorCode;
     }
 
     public String getDisplayCode() {
@@ -88,10 +109,16 @@ public enum NflTeams {
     }
 
     public static NflTeams getTeamByCode(String code) {
-        if (StringUtils.isBlank(code)) {
-            return null;
+        if (code == null) {
+            return UNKNOWN;
         }
 
-        return TEAMS_BY_CODE.get(code);
+        NflTeams nflTeam = TEAMS_BY_CODE.get(code);
+        if (nflTeam == null) {
+            log.warn("Unexpected team code {} encountered", code);
+            return UNKNOWN;
+        }
+
+        return nflTeam;
     }
 }

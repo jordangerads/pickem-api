@@ -43,35 +43,36 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        http
-            .csrf().disable()
-            .authenticationProvider(authenticationProvider())
-            .exceptionHandling()
-            .authenticationEntryPoint(httpAuthenticationEntryPoint)
-                .and()
-                .formLogin()
-                .permitAll().loginProcessingUrl("/login")
-                .usernameParameter("username")
-                .passwordParameter("password")
-                .successHandler(authSuccessHandler)
-                .failureHandler(new SimpleUrlAuthenticationFailureHandler() {
-                    @Override
-                    public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException, ServletException {
-                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    }
-                })
-                .and()
-                .logout().permitAll()
-                .logoutRequestMatcher(new AntPathRequestMatcher("/login", "DELETE"))
-                .logoutSuccessHandler((request, response, authentication) -> {
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    response.getWriter().flush();
-                })
-                .and()
-                .sessionManagement()
-                .maximumSessions(1);
-
-        http.authorizeRequests().anyRequest().authenticated();
+//        http
+//            .csrf().disable()
+//            .authenticationProvider(authenticationProvider())
+//            .exceptionHandling()
+//            .authenticationEntryPoint(httpAuthenticationEntryPoint)
+//                .and()
+//                .formLogin()
+//                .permitAll().loginProcessingUrl("/login")
+//                .usernameParameter("username")
+//                .passwordParameter("password")
+//                .successHandler(authSuccessHandler)
+//                .failureHandler(new SimpleUrlAuthenticationFailureHandler() {
+//                    @Override
+//                    public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException, ServletException {
+//                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+//                    }
+//                })
+//                .and()
+//                .logout().permitAll()
+//                .logoutRequestMatcher(new AntPathRequestMatcher("/login", "DELETE"))
+//                .logoutSuccessHandler((request, response, authentication) -> {
+//                    response.setStatus(HttpServletResponse.SC_OK);
+//                    response.getWriter().flush();
+//                })
+//                .and()
+//                .sessionManagement()
+//                .maximumSessions(1);
+//
+//        http.authorizeRequests().anyRequest().authenticated();
+        http.authorizeRequests().anyRequest().permitAll();
     }
 
     @Override
