@@ -3,6 +3,7 @@ package com.qci.pickem.data;
 import com.qci.pickem.model.UserView;
 
 import javax.persistence.*;
+import java.util.Set;
 
 @Entity
 @Table(name = "user")
@@ -18,6 +19,10 @@ public class User {
 
     @Column(name = "last_name")
     private String lastName;
+
+    @OneToMany
+    @JoinColumn(referencedColumnName = "user_id", insertable = false, updatable = false)
+    private Set<UserPool> userPools;
 
     public User() {
     }
@@ -49,5 +54,13 @@ public class User {
 
     public void setLastName(String lastName) {
         this.lastName = lastName;
+    }
+
+    public Set<UserPool> getUserPools() {
+        return userPools;
+    }
+
+    public void setUserPools(Set<UserPool> userPools) {
+        this.userPools = userPools;
     }
 }
