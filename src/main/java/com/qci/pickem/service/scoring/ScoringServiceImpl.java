@@ -8,6 +8,8 @@ import com.qci.pickem.exception.UserNotFoundException;
 import com.qci.pickem.repository.PickRepository;
 import com.qci.pickem.repository.UserRepository;
 import org.apache.commons.collections4.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class ScoringServiceImpl implements ScoringService {
+    private static final Logger log = LoggerFactory.getLogger(ScoringServiceImpl.class);
 
     private UserRepository userRepository;
     private PickRepository pickRepository;
@@ -44,9 +47,12 @@ public class ScoringServiceImpl implements ScoringService {
         }
 
         // Retrieve the user's picks for the week (and this pool!)
-//        Set<Pick> picks = pickRepository.getPicks(userId, poolId, season, week);
-        Set<Pick> picks = pickRepository.getPicks(userId, poolId);
+        Set<Pick> picks = pickRepository.getPicks(userId, poolId, season, week);
 
+        return getScoreForPicks(picks);
+    }
+
+    int getScoreForPicks(Set<Pick> picks) {
         // For each pick, check against the pool's strategy to see how many picks the user got right and calculate the score.
         int score = 0;
 
@@ -55,6 +61,7 @@ public class ScoringServiceImpl implements ScoringService {
                 score += getScoreForPick(pick);
             } catch (InvalidScoringRequestException e) {
                 // This is okay, the game just isn't complete yet.
+                log.trace("", e);
             }
         }
 

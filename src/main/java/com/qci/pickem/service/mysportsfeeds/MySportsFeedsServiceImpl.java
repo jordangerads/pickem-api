@@ -18,10 +18,10 @@ import java.util.Calendar;
 public class MySportsFeedsServiceImpl implements MySportsFeedsService {
     private static final Logger log = LoggerFactory.getLogger(MySportsFeedsServiceImpl.class);
 
-    @Value("${mysportsfeed.username}")
+    @Value("${mysportsfeeds.username}")
     private String username;
 
-    @Value("${mysportsfeed.password}")
+    @Value("${mysportsfeeds.password}")
     private String password;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

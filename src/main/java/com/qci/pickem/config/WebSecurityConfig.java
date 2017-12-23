@@ -72,7 +72,9 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 //                .maximumSessions(1);
 //
 //        http.authorizeRequests().anyRequest().authenticated();
-        http.authorizeRequests().anyRequest().permitAll();
+        http
+            .csrf().disable()
+            .authorizeRequests().anyRequest().permitAll();
     }
 
     @Override

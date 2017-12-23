@@ -11,11 +11,14 @@ public class UserPool {
     @Column(name = "user_pool_id", nullable = false)
     private Long userPoolId;
 
-    @Column(name = "user_id")
+    @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "pool_id")
+    @Column(name = "pool_id", nullable = false)
     private Long poolId;
+
+    @Column(name = "user_role", nullable = false)
+    private String userRole;
 
     @OneToOne
     @JoinColumn(referencedColumnName = "user_id", insertable = false, updatable = false)
@@ -66,5 +69,13 @@ public class UserPool {
 
     public void setPool(Pool pool) {
         this.pool = pool;
+    }
+
+    public String getUserRole() {
+        return userRole;
+    }
+
+    public void setUserRole(String userRole) {
+        this.userRole = userRole;
     }
 }

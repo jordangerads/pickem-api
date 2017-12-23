@@ -1,5 +1,8 @@
 package com.qci.pickem.data;
 
+import com.qci.pickem.model.PoolView;
+import org.springframework.stereotype.Component;
+
 import javax.persistence.*;
 
 @Entity
@@ -14,7 +17,15 @@ public class Pool {
     @Column(name = "pool_name")
     private String poolName;
 
+    @Column(name = "scoring_method")
+    private Integer scoringMethod;
+
     public Pool() {
+    }
+
+    public Pool(PoolView poolView) {
+        this.poolName = poolView.getName();
+        this.scoringMethod = poolView.getScoringMethod();
     }
 
     public long getPoolId() {
@@ -31,5 +42,13 @@ public class Pool {
 
     public void setPoolName(String poolName) {
         this.poolName = poolName;
+    }
+
+    public Integer getScoringMethod() {
+        return scoringMethod;
+    }
+
+    public void setScoringMethod(Integer scoringMethod) {
+        this.scoringMethod = scoringMethod;
     }
 }

@@ -12,7 +12,7 @@ public interface PickRepository extends CrudRepository<Pick, Long> {
     @Query(
         "SELECT p " +
         "FROM Pick p " +
-        "JOIN p.game g " +
+        "JOIN FETCH p.game g " +
         "WHERE p.userId = :userId AND " +
         "   p.poolId = :poolId AND " +
         "   g.season = :season AND " +

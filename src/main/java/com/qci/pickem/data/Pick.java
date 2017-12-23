@@ -26,7 +26,7 @@ public class Pick {
     @Column(name = "confidence")
     private Integer confidence;
 
-    @OneToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(referencedColumnName = "game_id", insertable = false, updatable = false)
     private Game game;
 

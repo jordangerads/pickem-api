@@ -23,15 +23,13 @@ import static org.junit.Assert.*;
 @SpringBootTest
 public class ScoringServiceImplTest {
 
-    @Autowired private ScoringService scoringService;
+    @Autowired private ScoringServiceImpl scoringService;
 
     @Autowired private UserRepository userRepository;
     @Autowired private PickRepository pickRepository;
     @Autowired private GameRepository gameRepository;
     @Autowired private PoolRepository poolRepository;
 
-    private long userId;
-    private long poolId;
     private Set<Pick> picks;
 
     @Before
@@ -42,7 +40,7 @@ public class ScoringServiceImplTest {
 
         pool = poolRepository.save(pool);
 
-        poolId = pool.getPoolId();
+        long poolId = pool.getPoolId();
 
         User user = new User();
         user.setFirstName("Jordan");
@@ -50,7 +48,7 @@ public class ScoringServiceImplTest {
 
         user = userRepository.save(user);
 
-        userId = user.getUserId();
+        long userId = user.getUserId();
 
         UserPool userPool = new UserPool();
         userPool.setUserId(userId);
@@ -64,9 +62,10 @@ public class ScoringServiceImplTest {
     @Test
     @Transactional
     public void test() {
-        int score = scoringService.getScore(userId, poolId, 1, 2017);
+        int score = scoringService.getScoreForPicks(picks);
 
-        assertEquals(136, score);
+        // 13, 14, 15 are not complete yet, so scores of 14, 15, and 16 aren't in. 136 is the max minus 45 = 91
+        assertEquals(91, score);
     }
 
     private Game createGame(long homeTeamId, long awayTeamId, long winningTeamId) {
@@ -77,7 +76,7 @@ public class ScoringServiceImplTest {
         game.setHomeTeamId(homeTeamId);
         game.setAwayTeamId(awayTeamId);
         game.setWinningTeamId(winningTeamId);
-        game.setGameComplete(homeTeamId > 25);
+        game.setGameComplete(homeTeamId < 13); // make most of the games complete.
 
         return gameRepository.save(game);
     }
@@ -93,7 +92,7 @@ public class ScoringServiceImplTest {
             pick.setPoolId(poolId);
             pick.setGameId(game.getGameId());
             pick.setChosenTeamId((long) i);
-            pick.setConfidence(i);
+            pick.setConfidence(i + 1); // scores start at 1 and go to 16.
 
             pick = pickRepository.save(pick);
 
