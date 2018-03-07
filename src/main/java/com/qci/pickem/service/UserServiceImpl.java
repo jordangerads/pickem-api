@@ -20,7 +20,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserView getUserById(Long id) {
-        return new UserView(userRepository.findOne(id));
+        User user = userRepository.findOne(id);
+        return user != null ? new UserView(user) : null;
     }
 
     @Override
