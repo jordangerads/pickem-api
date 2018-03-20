@@ -6,6 +6,7 @@ import com.gci.pickem.data.User;
 import com.gci.pickem.model.GamePick;
 import com.gci.pickem.repository.GameRepository;
 import com.gci.pickem.repository.UserRepository;
+import com.gci.pickem.service.mysportsfeeds.MySportsFeedsService;
 import com.google.common.collect.ImmutableMap;
 import com.gci.pickem.data.UserPool;
 import com.gci.pickem.model.UserPoolRole;
@@ -29,6 +30,7 @@ public class PicksServiceImplTest {
     @Mock private GameRepository gameRepository;
     @Mock private PoolRepository poolRepository;
     @Mock private UserRepository userRepository;
+    @Mock private MySportsFeedsService mySportsFeedsService;
 
     private PickServiceImpl service;
 
@@ -40,7 +42,7 @@ public class PicksServiceImplTest {
         setupUserMocks();
         setupGamesMocks();
 
-        service = new PickServiceImpl(pickRepository, gameRepository, poolRepository, userRepository);
+        service = new PickServiceImpl(pickRepository, gameRepository, poolRepository, userRepository, mySportsFeedsService);
     }
 
     @Test(expected = RuntimeException.class)

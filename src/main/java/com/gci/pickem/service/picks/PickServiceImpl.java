@@ -8,6 +8,7 @@ import com.gci.pickem.repository.UserRepository;
 import com.gci.pickem.model.ScoringMethod;
 import com.gci.pickem.repository.PickRepository;
 import com.gci.pickem.repository.PoolRepository;
+import com.gci.pickem.service.mysportsfeeds.MySportsFeedsService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,18 +30,21 @@ public class PickServiceImpl implements PickService {
     private GameRepository gameRepository;
     private PoolRepository poolRepository;
     private UserRepository userRepository;
+    private MySportsFeedsService mySportsFeedsService;
 
     @Autowired
     PickServiceImpl(
         PickRepository pickRepository,
         GameRepository gameRepository,
         PoolRepository poolRepository,
-        UserRepository userRepository
+        UserRepository userRepository,
+        MySportsFeedsService mySportsFeedsService
     ) {
         this.pickRepository = pickRepository;
         this.gameRepository = gameRepository;
         this.poolRepository = poolRepository;
         this.userRepository = userRepository;
+        this.mySportsFeedsService = mySportsFeedsService;
     }
 
     @Override
@@ -51,27 +55,72 @@ public class PickServiceImpl implements PickService {
             return;
         }
 
+        List<GamePick> picks = request.getGamePicks();
+
         validateUserValidForPool(request.getUserId(), request.getPoolId());
-        validateGames(request.getGamePicks());
-        validatePicksValidForPool(request.getPoolId(), request.getGamePicks());
+        validateGames(picks);
+        validatePicksValidForPool(request.getPoolId(), picks);
 
         // Everything appears to be valid. Let's save them picks!
-        List<Pick> picks =
-            request.getGamePicks().stream()
-            .map(gamePick -> {
-                Pick pick = new Pick();
+        int season = getSeason(picks);
+        int week = getWeek(picks);
 
-                pick.setUserId(request.getUserId());
-                pick.setPoolId(request.getPoolId());
-                pick.setGameId(gamePick.getGameId());
-                pick.setConfidence(gamePick.getConfidence());
-                pick.setChosenTeamId(gamePick.getChosenTeamId());
+        Set<Pick> existingPicks = pickRepository.getPicks(request.getUserId(), request.getPoolId(), season, week);
+        if (CollectionUtils.isEmpty(existingPicks)) {
+            // User has not saved any picks for this season/week/pool yet. Make all new ones.
+            List<Pick> toCreate =
+                request.getGamePicks().stream()
+                    .map(gamePick -> {
+                        Pick pick = new Pick();
 
-                return pick;
-            })
-            .collect(Collectors.toList());
+                        pick.setUserId(request.getUserId());
+                        pick.setPoolId(request.getPoolId());
+                        pick.setGameId(gamePick.getGameId());
+                        pick.setConfidence(gamePick.getConfidence());
+                        pick.setChosenTeamId(gamePick.getChosenTeamId());
 
-        pickRepository.save(picks);
+                        return pick;
+                    })
+                    .collect(Collectors.toList());
+
+            pickRepository.save(toCreate);
+        } else {
+            // User has existing picks saved, update confidences.
+            Map<Long, GamePick> picksByGameId = new HashMap<>();
+            picks.forEach(pick -> picksByGameId.put(pick.getGameId(), pick));
+
+            existingPicks.forEach(pick -> pick.setConfidence(picksByGameId.get(pick.getGameId()).getConfidence()));
+
+            pickRepository.save(existingPicks);
+        }
+    }
+
+    private int getWeek(List<GamePick> picks) {
+        Set<Long> gameIds = picks.stream().map(GamePick::getGameId).collect(Collectors.toSet());
+
+        Iterable<Game> allGames = gameRepository.findAll(gameIds);
+
+        Set<Integer> weeks = StreamSupport.stream(allGames.spliterator(), false).map(Game::getWeek).collect(Collectors.toSet());
+        if (weeks.size() != 1) {
+            // Every game in the submission should have the same single week value.
+            throw new RuntimeException(String.format("Expected only one week for the games provided in picks, found %d instead.", weeks.size()));
+        }
+
+        return weeks.iterator().next();
+    }
+
+    private int getSeason(List<GamePick> picks) {
+        Set<Long> gameIds = picks.stream().map(GamePick::getGameId).collect(Collectors.toSet());
+
+        Iterable<Game> allGames = gameRepository.findAll(gameIds);
+
+        Set<Integer> seasons = StreamSupport.stream(allGames.spliterator(), false).map(Game::getSeason).collect(Collectors.toSet());
+        if (seasons.size() != 1) {
+            // Every game in the submission should have the same single season value.
+            throw new RuntimeException(String.format("Expected only one season for the games provided in picks, found %d instead.", seasons.size()));
+        }
+
+        return seasons.iterator().next();
     }
 
     void validatePicksValidForPool(Long poolId, List<GamePick> picks) {
@@ -135,23 +184,10 @@ public class PickServiceImpl implements PickService {
             throw new RuntimeException(String.format("Game picks provided should have covered %d games, but only covered %d.", picks.size(), gameIds.size()));
         }
 
-        Iterable<Game> allGames = gameRepository.findAll(gameIds);
+        int week = getWeek(picks);
+        int season = getSeason(picks);
 
-        Set<Integer> weeks = StreamSupport.stream(allGames.spliterator(), false).map(Game::getWeek).collect(Collectors.toSet());
-
-        if (weeks.size() != 1) {
-            // Every game in the submission should have the same single week value.
-            throw new RuntimeException(String.format("Expected only one week for the games provided in picks, found %d instead.", weeks.size()));
-        }
-
-        Set<Integer> seasons = StreamSupport.stream(allGames.spliterator(), false).map(Game::getSeason).collect(Collectors.toSet());
-
-        if (seasons.size() != 1) {
-            // Every game in the submission should have the same single season value.
-            throw new RuntimeException(String.format("Expected only one season for the games provided in picks, found %d instead.", seasons.size()));
-        }
-
-        List<Game> gamesForWeek = gameRepository.findAllBySeasonAndWeek(seasons.iterator().next(), weeks.iterator().next());
+        List<Game> gamesForWeek = gameRepository.findAllBySeasonAndWeek(season, week);
         if (gamesForWeek.size() != picks.size()) {
             // Always expect a number of picks objects equal to the number of games in the week, even if some confidences are left empty for now.
             throw new RuntimeException(String.format("Unexpected number of picks provided. Expected %d, but received %d", gamesForWeek.size(), picks.size()));
@@ -171,7 +207,7 @@ public class PickServiceImpl implements PickService {
 
             Game theGame = gamesMap.get(gamePick.getGameId());
             if (theGame == null) {
-                throw new RuntimeException(String.format("Received pick for game ID %d which isn't valid for game with week ID %d", gamePick.getGameId(), weeks.iterator().next()));
+                throw new RuntimeException(String.format("Received pick for game ID %d which isn't valid for game with week ID %d", gamePick.getGameId(), week));
             }
 
             if (!gamePick.getChosenTeamId().equals(theGame.getHomeTeamId()) && !gamePick.getChosenTeamId().equals(theGame.getAwayTeamId())) {
