@@ -10,6 +10,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 public final class Game {
+
+    private final long gameId;
     private final String homeTeam;
     private final String awayTeam;
 
@@ -18,7 +20,8 @@ public final class Game {
 
     private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
-    public Game(GameEntry gameEntry) {
+    public Game(GameEntry gameEntry, long gameId) {
+        this.gameId = gameId;
         this.homeTeam = NflTeams.getTeamByCode(gameEntry.getHomeTeam().getAbbreviation()).getFullName();
         this.awayTeam = NflTeams.getTeamByCode(gameEntry.getAwayTeam().getAbbreviation()).getFullName();
 
@@ -29,10 +32,15 @@ public final class Game {
     }
 
     public Game(com.gci.pickem.data.Game game) {
+        this.gameId = game.getGameId();
         this.homeTeam = NflTeams.getTeamByCode(game.getHomeTeam().getAbbreviation()).getFullName();
         this.awayTeam = NflTeams.getTeamByCode(game.getAwayTeam().getAbbreviation()).getFullName();
 
         this.gameTime = LocalDateTime.ofInstant(game.getGameTime().toInstant(), ZoneId.systemDefault());
+    }
+
+    public long getGameId() {
+        return gameId;
     }
 
     public String getHomeTeam() {

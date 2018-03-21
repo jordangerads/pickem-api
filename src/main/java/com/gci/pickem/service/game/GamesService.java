@@ -8,7 +8,7 @@ public interface GamesService {
 
     Game findByExternalId(Integer externalId);
 
-    void saveGame(Game game);
+    Game saveGame(Game game);
 
     Collection<Game> findAllBySeasonAndWeek(int season, int week);
 }

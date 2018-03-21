@@ -16,10 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,10 +49,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .filter(entry -> entry.getWeek().equals(week))
                 .collect(Collectors.toList());
 
-            processNewData(weekEntries);
-
             List<com.gci.pickem.model.Game> games =
-                schedule.getGameEntries().stream()
+                    processNewData(weekEntries).stream()
                     .filter(entry -> entry.getWeek().equals(week))
                     .map(com.gci.pickem.model.Game::new)
                     .sorted(Comparator.comparing(com.gci.pickem.model.Game::getGameTime))
@@ -67,43 +62,50 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
     }
 
-    private void processNewData(List<GameEntry> gameEntries) {
+    private List<Game> processNewData(List<GameEntry> gameEntries) {
+        List<Game> games = new ArrayList<>();
+
         for (GameEntry entry : gameEntries) {
             // Process teams before the game.
             processTeam(entry.getHomeTeam());
             processTeam(entry.getAwayTeam());
 
-            processGame(entry);
+            games.add(processGame(entry));
         }
+
+        return games;
     }
 
-    private void processGame(GameEntry entry) {
+    private Game processGame(GameEntry entry) {
         com.gci.pickem.data.Game game = gamesService.findByExternalId(entry.getId());
-        if (game == null) {
-            // Game isn't in the DB yet.
-            game = new com.gci.pickem.data.Game();
-            game.setSeason(SeasonUtil.getSeasonForDate(entry.getDate()));
-            game.setWeek(entry.getWeek());
-            game.setExternalId(entry.getId());
 
-            Date gameDate = java.sql.Date.valueOf(LocalDateTime.ofInstant(entry.getDate().toInstant(), ZoneId.of("UTC")).toLocalDate());
-
-            game.setGameTime(gameDate);
-
-            com.gci.pickem.data.Team away = teamService.findByExternalId((long) entry.getAwayTeam().getId());
-            game.setAwayTeamId(away.getTeamId());
-
-            com.gci.pickem.data.Team home = teamService.findByExternalId((long) entry.getHomeTeam().getId());
-            game.setHomeTeamId(home.getTeamId());
-
-            // Check if the game has been finalized.
-            GameScore score = mySportsFeedsService.getGameScore(gameDate, entry.getId());
-            game.setGameComplete(Boolean.valueOf(score.getIsCompleted()));
-            game.setWinningTeamId(score.getHomeScore().compareTo(score.getAwayScore()) > 0 ? home.getTeamId() : away.getTeamId());
-
-            // This needs to be transactional here!
-            gamesService.saveGame(game);
+        if (game != null) {
+            return game;
         }
+
+        // Game isn't in the DB yet.
+        game = new com.gci.pickem.data.Game();
+        game.setSeason(SeasonUtil.getSeasonForDate(entry.getDate()));
+        game.setWeek(entry.getWeek());
+        game.setExternalId(entry.getId());
+
+        Date gameDate = java.sql.Date.valueOf(LocalDateTime.ofInstant(entry.getDate().toInstant(), ZoneId.of("UTC")).toLocalDate());
+
+        game.setGameTime(gameDate);
+
+        com.gci.pickem.data.Team away = teamService.findByExternalId((long) entry.getAwayTeam().getId());
+        game.setAwayTeamId(away.getTeamId());
+
+        com.gci.pickem.data.Team home = teamService.findByExternalId((long) entry.getHomeTeam().getId());
+        game.setHomeTeamId(home.getTeamId());
+
+        // Check if the game has been finalized.
+        GameScore score = mySportsFeedsService.getGameScore(gameDate, entry.getId());
+        game.setGameComplete(Boolean.valueOf(score.getIsCompleted()));
+        game.setWinningTeamId(score.getHomeScore().compareTo(score.getAwayScore()) > 0 ? home.getTeamId() : away.getTeamId());
+
+        // This needs to be transactional here!
+        return gamesService.saveGame(game);
     }
 
     private void processTeam(Team external) {
