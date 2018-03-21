@@ -50,6 +50,7 @@ dependencies {
     compile('org.apache.commons:commons-collections4:4.1')
     compile("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.9.3")
     compile('org.flywaydb:flyway-core:5.0.3')
+
     runtime('org.postgresql:postgresql')
 
 	testCompile('org.springframework.boot:spring-boot-starter-test')

@@ -1,6 +1,7 @@
 package com.gci.pickem.service.schedule;
 
 import com.gci.pickem.data.Game;
+import com.gci.pickem.model.TeamView;
 import com.gci.pickem.model.WeekGames;
 import com.gci.pickem.model.mysportsfeeds.FullGameSchedule;
 import com.gci.pickem.model.mysportsfeeds.GameEntry;
@@ -49,17 +50,30 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .filter(entry -> entry.getWeek().equals(week))
                 .collect(Collectors.toList());
 
+            List<Game> newGames = processNewData(weekEntries);
             List<com.gci.pickem.model.Game> games =
-                    processNewData(weekEntries).stream()
+                newGames.stream()
                     .filter(entry -> entry.getWeek().equals(week))
-                    .map(com.gci.pickem.model.Game::new)
+                    .map(this::getGameView)
                     .sorted(Comparator.comparing(com.gci.pickem.model.Game::getGameTime))
                     .collect(Collectors.toList());
 
             return new WeekGames(games);
         } else {
-            return new WeekGames(existingGames.stream().map(com.gci.pickem.model.Game::new).collect(Collectors.toList()));
+            return new WeekGames(existingGames.stream().map(this::getGameView).collect(Collectors.toList()));
         }
+    }
+
+    private com.gci.pickem.model.Game getGameView(Game game) {
+        com.gci.pickem.model.Game model = new com.gci.pickem.model.Game();
+
+        model.setGameId(game.getGameId());
+        model.setGameTime(LocalDateTime.ofInstant(game.getGameTime(), ZoneId.systemDefault()));
+
+        model.setHomeTeam(new TeamView(teamService.findById(game.getHomeTeamId())));
+        model.setAwayTeam(new TeamView(teamService.findById(game.getAwayTeamId())));
+
+        return model;
     }
 
     private List<Game> processNewData(List<GameEntry> gameEntries) {
@@ -85,13 +99,12 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         // Game isn't in the DB yet.
         game = new com.gci.pickem.data.Game();
-        game.setSeason(SeasonUtil.getSeasonForDate(entry.getDate()));
+
+        game.setSeason(SeasonUtil.getSeasonForDate(entry.getDate().toInstant()));
         game.setWeek(entry.getWeek());
         game.setExternalId(entry.getId());
 
-        Date gameDate = java.sql.Date.valueOf(LocalDateTime.ofInstant(entry.getDate().toInstant(), ZoneId.of("UTC")).toLocalDate());
-
-        game.setGameTime(gameDate);
+        game.setGameTime(entry.getDate().toInstant());
 
         com.gci.pickem.data.Team away = teamService.findByExternalId((long) entry.getAwayTeam().getId());
         game.setAwayTeamId(away.getTeamId());
@@ -100,7 +113,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         game.setHomeTeamId(home.getTeamId());
 
         // Check if the game has been finalized.
-        GameScore score = mySportsFeedsService.getGameScore(gameDate, entry.getId());
+        GameScore score = mySportsFeedsService.getGameScore(entry.getDate().toInstant(), entry.getId());
         game.setGameComplete(Boolean.valueOf(score.getIsCompleted()));
         game.setWinningTeamId(score.getHomeScore().compareTo(score.getAwayScore()) > 0 ? home.getTeamId() : away.getTeamId());
 
@@ -109,6 +122,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     private void processTeam(Team external) {
+        // TODO: Possible this data could get out of sync. We should probably compare everything and update our record.
         com.gci.pickem.data.Team team = teamService.findByExternalId((long) external.getId());
         if (team == null) {
             // Team doesn't already exist.

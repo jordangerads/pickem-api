@@ -2,7 +2,6 @@ package com.gci.pickem.controller;
 
 import com.gci.pickem.exception.MissingRequiredDataException;
 import com.gci.pickem.model.Game;
-import com.gci.pickem.model.NflTeams;
 import com.gci.pickem.model.WeekGames;
 import org.junit.Assert;
 import org.junit.Test;
@@ -30,8 +29,10 @@ public class ScheduleControllerTest {
 
         Game game = gamesByWeekOfYear.getGames().get(0);
 
-        Assert.assertEquals(NflTeams.DENVER_BRONCOS.getFullName(), game.getHomeTeam());
-        assertEquals(NflTeams.CAROLINA_PANTHERS.getFullName(), game.getAwayTeam());
+        Assert.assertEquals("Denver", game.getHomeTeam().getCity());
+        Assert.assertEquals("Broncos", game.getHomeTeam().getTeamName());
+        Assert.assertEquals("Carolina", game.getAwayTeam().getCity());
+        Assert.assertEquals("Panthers", game.getAwayTeam().getTeamName());
         assertEquals(LocalDateTime.parse("2016-09-07T20:30", DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")), game.getGameTime());
     }
 

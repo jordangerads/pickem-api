@@ -7,4 +7,6 @@ public interface TeamService {
     void createTeam(Team team);
 
     Team findByExternalId(Long externalId);
+
+    Team findById(Long teamId);
 }

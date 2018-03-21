@@ -1,7 +1,9 @@
 package com.gci.pickem.data;
 
+import com.gci.pickem.util.TimestampConverter;
+
 import javax.persistence.*;
-import java.util.Date;
+import java.time.Instant;
 
 @Entity
 @Table(name = "game")
@@ -31,16 +33,17 @@ public class Game {
     private Long winningTeamId;
 
     @Column(name = "game_time")
-    private Date gameTime;
+    @Convert(converter = TimestampConverter.class)
+    private Instant gameTime;
 
     @Column(name = "external_game_id")
     private Integer externalId;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "home_team_id", referencedColumnName = "team_id", insertable = false, updatable = false)
     private Team homeTeam;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "away_team_id", referencedColumnName = "team_id", insertable = false, updatable = false)
     private Team awayTeam;
 
@@ -103,11 +106,11 @@ public class Game {
         this.winningTeamId = winningTeamId;
     }
 
-    public Date getGameTime() {
+    public Instant getGameTime() {
         return gameTime;
     }
 
-    public void setGameTime(Date gameTime) {
+    public void setGameTime(Instant gameTime) {
         this.gameTime = gameTime;
     }
 

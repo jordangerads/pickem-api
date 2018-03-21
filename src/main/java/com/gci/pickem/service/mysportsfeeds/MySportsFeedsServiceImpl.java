@@ -20,9 +20,12 @@ import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.*;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Base64;
+import java.util.Calendar;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -37,7 +40,6 @@ public class MySportsFeedsServiceImpl implements MySportsFeedsService {
     private String password;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyyMMdd");
 
     private final CacheLoader<String, String> cacheLoader = new CacheLoader<String, String>() {
         @Override
@@ -88,23 +90,26 @@ public class MySportsFeedsServiceImpl implements MySportsFeedsService {
     }
 
     @Override
-    public GameScore getGameScore(Date date, Integer msfGameId) {
-        int season = SeasonUtil.getSeasonForDate(date);
+    public GameScore getGameScore(Instant instant, Integer msfGameId) {
+        int season = SeasonUtil.getSeasonForDate(instant);
         String requestYear = String.format("%d-%d-regular", season, season + 1);
+
+        DateTimeFormatter formatter =
+            DateTimeFormatter.ofPattern("yyyyMMdd").withZone( ZoneId.of("UTC") );
 
         String url =
             String.format(
                 "https://api.mysportsfeeds.com/v1.2/pull/nfl/%s/scoreboard.json?fordate=%s",
                 requestYear,
-                DATE_FORMAT.format(date));
+                formatter.format(instant));
 
         ScoreboardResponse response = getResponse(url, ScoreboardResponse.class);
         if (response == null || response.getScoreboard() == null) {
-            throw new RuntimeException(String.format("No response retrieved for scoreboard request for date %s and game ID %d", date.toString(), msfGameId));
+            throw new RuntimeException(String.format("No response retrieved for scoreboard request for date %s and game ID %d", instant.toString(), msfGameId));
         }
 
         if (CollectionUtils.isEmpty(response.getScoreboard().getGameScores())) {
-            throw new RuntimeException(String.format("No games found for scoreboard request for date %s and game ID %d", date.toString(), msfGameId));
+            throw new RuntimeException(String.format("No games found for scoreboard request for date %s and game ID %d", instant.toString(), msfGameId));
         }
 
         Optional<GameScore> gameScore =
@@ -114,7 +119,7 @@ public class MySportsFeedsServiceImpl implements MySportsFeedsService {
                 .findFirst();
 
         if (!gameScore.isPresent()) {
-            throw new RuntimeException(String.format("No game matching game ID %d found in scoreboard request for date %s", msfGameId, date.toString()));
+            throw new RuntimeException(String.format("No game matching game ID %d found in scoreboard request for date %s", msfGameId, instant.toString()));
         }
 
         return gameScore.get();

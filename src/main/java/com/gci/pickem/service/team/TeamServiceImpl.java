@@ -28,4 +28,9 @@ public class TeamServiceImpl implements TeamService {
     public Team findByExternalId(Long externalId) {
         return teamRepository.findByExternalId(externalId);
     }
+
+    @Override
+    public Team findById(Long teamId) {
+        return teamRepository.findOne(teamId);
+    }
 }
