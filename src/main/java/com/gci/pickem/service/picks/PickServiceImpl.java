@@ -3,22 +3,20 @@ package com.gci.pickem.service.picks;
 import com.gci.pickem.data.*;
 import com.gci.pickem.model.GamePick;
 import com.gci.pickem.model.UserPicksRequest;
+import com.gci.pickem.model.WeekGames;
 import com.gci.pickem.repository.GameRepository;
 import com.gci.pickem.repository.UserRepository;
 import com.gci.pickem.model.ScoringMethod;
 import com.gci.pickem.repository.PickRepository;
 import com.gci.pickem.repository.PoolRepository;
-import com.gci.pickem.service.mysportsfeeds.MySportsFeedsService;
+import com.gci.pickem.service.schedule.ScheduleService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -30,7 +28,7 @@ public class PickServiceImpl implements PickService {
     private GameRepository gameRepository;
     private PoolRepository poolRepository;
     private UserRepository userRepository;
-    private MySportsFeedsService mySportsFeedsService;
+    private ScheduleService scheduleService;
 
     @Autowired
     PickServiceImpl(
@@ -38,13 +36,13 @@ public class PickServiceImpl implements PickService {
         GameRepository gameRepository,
         PoolRepository poolRepository,
         UserRepository userRepository,
-        MySportsFeedsService mySportsFeedsService
+        ScheduleService scheduleService
     ) {
         this.pickRepository = pickRepository;
         this.gameRepository = gameRepository;
         this.poolRepository = poolRepository;
         this.userRepository = userRepository;
-        this.mySportsFeedsService = mySportsFeedsService;
+        this.scheduleService = scheduleService;
     }
 
     @Override
@@ -92,6 +90,37 @@ public class PickServiceImpl implements PickService {
             existingPicks.forEach(pick -> pick.setConfidence(picksByGameId.get(pick.getGameId()).getConfidence()));
 
             pickRepository.save(existingPicks);
+        }
+    }
+
+    @Override
+    public List<Integer> getConfidenceValues(Long poolId, Integer season, Integer week) {
+        Pool pool = poolRepository.findOne(poolId);
+        if (pool == null) {
+            throw new RuntimeException(String.format("No pool found for poolId %d", poolId));
+        }
+
+        ScoringMethod method = ScoringMethod.getScoringMethodById(pool.getScoringMethod());
+        if (method == null) {
+            throw new RuntimeException(String.format("No scoring method found for pool with ID %d", poolId));
+        }
+
+        WeekGames weekGames = scheduleService.getGamesForSeasonAndWeek(season, week);
+
+        switch (method) {
+            case ABSOLUTE:
+                return Collections.nCopies(weekGames.getGames().size(), 1);
+            case SIXTEEN_DOWN:
+                List<Integer> values = new ArrayList<>();
+
+                int nextVal = 16;
+                for (Iterator<com.gci.pickem.model.Game> iter = weekGames.getGames().iterator(); iter.hasNext(); iter.next()) {
+                    values.add(nextVal--);
+                }
+
+                return values;
+            default:
+                throw new RuntimeException(String.format("Unexpected method %s found for pool with ID %d", method, poolId));
         }
     }
 

@@ -33,7 +33,7 @@ public class ScheduleControllerTest {
         Assert.assertEquals("Broncos", game.getHomeTeam().getTeamName());
         Assert.assertEquals("Carolina", game.getAwayTeam().getCity());
         Assert.assertEquals("Panthers", game.getAwayTeam().getTeamName());
-        assertEquals(LocalDateTime.parse("2016-09-07T20:30", DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")), game.getGameTime());
+        assertEquals(LocalDateTime.parse("2016-09-07T19:00", DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")), game.getGameTime());
     }
 
     @Test(expected = MissingRequiredDataException.class)
