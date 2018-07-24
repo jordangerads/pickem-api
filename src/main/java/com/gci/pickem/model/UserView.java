@@ -7,6 +7,7 @@ import java.util.Objects;
 public class UserView {
 
     private Long id;
+    private String username;
     private String firstName;
     private String lastName;
 
@@ -15,12 +16,21 @@ public class UserView {
 
     public UserView(User user) {
         this.id = user.getUserId();
+        this.username = user.getEmail();
         this.firstName = user.getFirstName();
         this.lastName = user.getLastName();
     }
 
     public Long getId() {
         return id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public String getFirstName() {
@@ -45,12 +55,14 @@ public class UserView {
         if (o == null || getClass() != o.getClass()) return false;
         UserView userView = (UserView) o;
         return Objects.equals(id, userView.id) &&
+                Objects.equals(username, userView.username) &&
                 Objects.equals(firstName, userView.firstName) &&
                 Objects.equals(lastName, userView.lastName);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, firstName, lastName);
+
+        return Objects.hash(id, username, firstName, lastName);
     }
 }
