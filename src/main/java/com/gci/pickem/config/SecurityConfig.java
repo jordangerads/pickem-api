@@ -75,7 +75,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         return new WebMvcConfigurerAdapter() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/api/v1/**").allowedOrigins("http://pickem-football.herokuapp.com");
+                registry.addMapping("/api/v1/**").allowedOrigins("https://pickem-football.herokuapp.com");
             }
         };
     }
