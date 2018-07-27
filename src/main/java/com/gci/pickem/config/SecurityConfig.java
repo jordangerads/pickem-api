@@ -78,7 +78,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
 
         corsConfiguration.setAllowedOrigins(Lists.newArrayList("https://pickem-football.herokuapp.com"));
-        corsConfiguration.setAllowedMethods(Lists.newArrayList("GET", "POST"));
+        corsConfiguration.setAllowedMethods(Lists.newArrayList("GET", "PUT", "POST", "OPTIONS"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", corsConfiguration);
