@@ -26,6 +26,8 @@ public class CorsFilter extends org.springframework.web.filter.CorsFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         log.info("I'm here!");
 
+        log.info(request.getRequestURI());
+
         super.doFilterInternal(request, response, filterChain);
     }
 }
