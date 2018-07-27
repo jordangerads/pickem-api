@@ -9,6 +9,7 @@ import com.gci.pickem.repository.UserRepository;
 import com.gci.pickem.model.ScoringMethod;
 import com.gci.pickem.repository.PickRepository;
 import com.gci.pickem.repository.PoolRepository;
+import com.gci.pickem.service.mail.MailService;
 import com.gci.pickem.service.schedule.ScheduleService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -29,6 +31,7 @@ public class PickServiceImpl implements PickService {
     private PoolRepository poolRepository;
     private UserRepository userRepository;
     private ScheduleService scheduleService;
+    private MailService mailService;
 
     @Autowired
     PickServiceImpl(
@@ -36,13 +39,15 @@ public class PickServiceImpl implements PickService {
         GameRepository gameRepository,
         PoolRepository poolRepository,
         UserRepository userRepository,
-        ScheduleService scheduleService
+        ScheduleService scheduleService,
+        MailService mailService
     ) {
         this.pickRepository = pickRepository;
         this.gameRepository = gameRepository;
         this.poolRepository = poolRepository;
         this.userRepository = userRepository;
         this.scheduleService = scheduleService;
+        this.mailService = mailService;
     }
 
     @Override
@@ -124,6 +129,24 @@ public class PickServiceImpl implements PickService {
         }
     }
 
+    @Override
+    public void notifyUsersWithoutPicks() {
+        LocalTime midnight = LocalTime.MIDNIGHT;
+        LocalDate today = LocalDate.now(ZoneId.of("America/Chicago"));
+        LocalDateTime todayMidnight = LocalDateTime.of(today, midnight);
+        LocalDateTime tomorrowMidnight = todayMidnight.plusDays(1);
+
+        // Find all games
+        List<Game> games =
+            gameRepository.findByGameTimeBetween(
+                todayMidnight.toInstant(ZoneOffset.UTC),
+                tomorrowMidnight.toInstant(ZoneOffset.UTC));
+
+        // Find all users in pools who haven't made picks for the given games
+
+        log.info("" + games.size());
+    }
+
     private int getWeek(List<GamePick> picks) {
         Set<Long> gameIds = picks.stream().map(GamePick::getGameId).collect(Collectors.toSet());
 
@@ -152,7 +175,7 @@ public class PickServiceImpl implements PickService {
         return seasons.iterator().next();
     }
 
-    void validatePicksValidForPool(Long poolId, List<GamePick> picks) {
+    private void validatePicksValidForPool(Long poolId, List<GamePick> picks) {
         if (poolId == null) {
             throw new RuntimeException("No pool ID provided for pick submission request.");
         }

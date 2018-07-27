@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 
 public interface GameRepository extends CrudRepository<Game, Long> {
@@ -21,4 +22,6 @@ public interface GameRepository extends CrudRepository<Game, Long> {
         "WHERE g.gameId = :gameId"
     )
     Game findGameAndFetchTeams(@Param("gameId") Long gameId);
+
+    List<Game> findByGameTimeBetween(Instant start, Instant end);
 }

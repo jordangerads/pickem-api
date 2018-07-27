@@ -3,6 +3,8 @@ package com.gci.pickem.controller;
 import com.gci.pickem.exception.InvalidUserAccessException;
 import com.gci.pickem.exception.UserNotFoundException;
 import com.gci.pickem.model.UserView;
+import com.gci.pickem.service.mail.MailService;
+import com.gci.pickem.service.picks.PickService;
 import com.gci.pickem.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -15,12 +17,18 @@ import javax.servlet.http.HttpServletRequest;
 public class UserController {
 
     private UserService userService;
+    private MailService mailService;
+    private PickService pickService;
 
     @Autowired
     UserController(
-        UserService userService
+        UserService userService,
+        MailService mailService,
+        PickService pickService
     ) {
         this.userService = userService;
+        this.mailService = mailService;
+        this.pickService = pickService;
     }
 
     @GetMapping("api/v1/user/{id}")
@@ -39,6 +47,14 @@ public class UserController {
 
         return userView;
     }
+
+    @GetMapping("api/v1/user/sendEmail")
+    @PreAuthorize("hasAuthority('USER')")
+    public void sendEmail() {
+        pickService.notifyUsersWithoutPicks();
+//        mailService.sendEmail();
+    }
+
 
     @ExceptionHandler(InvalidUserAccessException.class)
     @ResponseStatus(value = HttpStatus.FORBIDDEN)

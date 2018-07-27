@@ -9,4 +9,6 @@ public interface PickService {
     void saveUserPicks(UserPicksRequest request);
 
     List<Integer> getConfidenceValues(Long poolId, Integer season, Integer week);
+
+    void notifyUsersWithoutPicks();
 }
