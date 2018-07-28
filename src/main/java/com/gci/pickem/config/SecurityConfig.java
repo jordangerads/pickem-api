@@ -73,18 +73,18 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             .disable();
     }
 
-    @Bean(name = "configSource")
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration corsConfiguration = new CorsConfiguration();
-
-        corsConfiguration.setAllowedOrigins(Lists.newArrayList("https://pickem-football.herokuapp.com"));
-        corsConfiguration.setAllowedMethods(Lists.newArrayList("GET", "PUT", "POST", "OPTIONS"));
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", corsConfiguration);
-
-        return source;
-    }
+//    @Bean(name = "configSource")
+//    public CorsConfigurationSource corsConfigurationSource() {
+//        CorsConfiguration corsConfiguration = new CorsConfiguration();
+//
+//        corsConfiguration.setAllowedOrigins(Lists.newArrayList("https://pickem-football.herokuapp.com"));
+//        corsConfiguration.setAllowedMethods(Lists.newArrayList("GET", "PUT", "POST", "OPTIONS"));
+//
+//        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+//        source.registerCorsConfiguration("/**", corsConfiguration);
+//
+//        return source;
+//    }
 
     @Bean
     public JwtAccessTokenConverter accessTokenConverter() {
