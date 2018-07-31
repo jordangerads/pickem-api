@@ -43,7 +43,7 @@ public class UserControllerTest {
         toCreate.setFirstName("test");
         toCreate.setLastName("test");
         toCreate.setEmail("test@test.com");
-        toCreate.setPassword("ecd71870d1963316a97e3ac3408c9835ad8cf0f3c1bc703527c30265534f75ae");
+        toCreate.setPassword("$2a$10$blhN4BgQg2PcHYyPCYk1MOvs6gg8BK5/Pqn.Yp.UA9T3fDPetJ2Re");
 
         user = userRepository.save(toCreate);
 
@@ -55,7 +55,7 @@ public class UserControllerTest {
 
         user.setUserRoles(Sets.newHashSet(userRole));
 
-        UsernamePasswordAuthenticationToken authRequest = new UsernamePasswordAuthenticationToken("test@test.com", "test123");
+        UsernamePasswordAuthenticationToken authRequest = new UsernamePasswordAuthenticationToken("test@test.com", "p@ssw0rd");
         Authentication auth = authenticationManager.authenticate(authRequest);
         SecurityContext context = SecurityContextHolder.getContext();
         context.setAuthentication(auth);
@@ -72,6 +72,12 @@ public class UserControllerTest {
 
         UserView retrieved = controller.getUserById(user.getUserId(), request);
 
-        assertEquals(retrieved, new UserView(user));
+        UserView expected = new UserView(user);
+
+        assertEquals(expected.getFirstName(), retrieved.getFirstName());
+        assertEquals(expected.getLastName(), retrieved.getLastName());
+        assertEquals(expected.getUsername(), retrieved.getUsername());
+        assertEquals(expected.getPassword(), retrieved.getPassword());
+        assertEquals(expected.getId(), retrieved.getId());
     }
 }

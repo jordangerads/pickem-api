@@ -1,4 +1,4 @@
-package com.gci.pickem.config;
+package com.gci.pickem.config.filter;
 
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;

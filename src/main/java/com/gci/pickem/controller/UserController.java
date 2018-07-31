@@ -67,9 +67,4 @@ public class UserController {
     public void handleUserNotFound() {
         // Nothing to do.
     }
-
-    @PostMapping("api/v1/user")
-    public UserView createUser(@RequestBody UserView userView) {
-        return userService.createUser(userView);
-    }
 }

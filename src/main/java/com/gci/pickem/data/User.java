@@ -40,6 +40,7 @@ public class User {
     public User(UserView userView) {
         this.firstName = userView.getFirstName();
         this.lastName = userView.getLastName();
+        this.email = userView.getUsername();
     }
 
     public Long getUserId() {
