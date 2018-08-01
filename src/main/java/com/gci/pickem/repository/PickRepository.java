@@ -21,13 +21,4 @@ public interface PickRepository extends CrudRepository<Pick, Long> {
                        @Param("poolId") long poolId,
                        @Param("season") int season,
                        @Param("week") int week);
-
-    @Query(
-            "SELECT p " +
-                    "FROM Pick p " +
-                    "JOIN FETCH p.game g " +
-                    "WHERE p.userId = :userId AND " +
-                    "   p.poolId = :poolId")
-    Set<Pick> getPicks(@Param("userId") long userId,
-                       @Param("poolId") long poolId);
 }

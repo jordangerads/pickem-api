@@ -32,9 +32,10 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
     public void configure(HttpSecurity http) throws Exception {
         http
             .requestMatchers()
-            .and()
+                .and()
             .authorizeRequests()
             .antMatchers("/actuator/**", "/api-docs/**").permitAll()
+            .antMatchers("/api/v1/user/register", "/api/v1/user/confirm", "/api/v1/user/forgot-password").permitAll()
             .antMatchers("/api/v1/**").authenticated();
     }
 }

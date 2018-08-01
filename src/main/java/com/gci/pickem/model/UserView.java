@@ -2,23 +2,27 @@ package com.gci.pickem.model;
 
 import com.gci.pickem.data.User;
 
-import java.util.Objects;
-
 public class UserView {
 
     private Long id;
     private String username;
+    private String password;
     private String firstName;
     private String lastName;
+    private String registrationCode;
+    private Boolean isActive;
 
     public UserView() {
     }
 
     public UserView(User user) {
         this.id = user.getUserId();
+        this.password = "[PROTECTED]";
         this.username = user.getEmail();
         this.firstName = user.getFirstName();
         this.lastName = user.getLastName();
+        this.registrationCode = user.getRegistrationCode();
+        this.isActive = user.getActive();
     }
 
     public Long getId() {
@@ -49,20 +53,27 @@ public class UserView {
         this.lastName = lastName;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        UserView userView = (UserView) o;
-        return Objects.equals(id, userView.id) &&
-                Objects.equals(username, userView.username) &&
-                Objects.equals(firstName, userView.firstName) &&
-                Objects.equals(lastName, userView.lastName);
+    public String getPassword() {
+        return password;
     }
 
-    @Override
-    public int hashCode() {
+    public void setPassword(String password) {
+        this.password = password;
+    }
 
-        return Objects.hash(id, username, firstName, lastName);
+    public Boolean getActive() {
+        return isActive;
+    }
+
+    public void setActive(Boolean active) {
+        isActive = active;
+    }
+
+    public String getRegistrationCode() {
+        return registrationCode;
+    }
+
+    public void setRegistrationCode(String registrationCode) {
+        this.registrationCode = registrationCode;
     }
 }

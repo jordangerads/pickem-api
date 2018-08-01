@@ -26,6 +26,12 @@ public class User {
     @Column(name = "password")
     private String password;
 
+    @Column(name = "is_active")
+    private Boolean isActive = false;
+
+    @Column(name = "registration_code")
+    private String registrationCode;
+
     @OneToMany
     @JoinColumn(name = "user_id", referencedColumnName = "user_id", insertable = false, updatable = false)
     private Set<UserPool> userPools;
@@ -40,6 +46,9 @@ public class User {
     public User(UserView userView) {
         this.firstName = userView.getFirstName();
         this.lastName = userView.getLastName();
+        this.email = userView.getUsername();
+        this.isActive = userView.getActive();
+        this.registrationCode = userView.getRegistrationCode();
     }
 
     public Long getUserId() {
@@ -80,6 +89,22 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public Boolean getActive() {
+        return isActive;
+    }
+
+    public void setActive(Boolean active) {
+        isActive = active;
+    }
+
+    public String getRegistrationCode() {
+        return registrationCode;
+    }
+
+    public void setRegistrationCode(String registrationCode) {
+        this.registrationCode = registrationCode;
     }
 
     public Set<UserPool> getUserPools() {

@@ -2,8 +2,15 @@ package com.gci.pickem.controller;
 
 import com.gci.pickem.exception.InvalidUserAccessException;
 import com.gci.pickem.exception.UserNotFoundException;
+import com.gci.pickem.model.ForgotPasswordRequest;
+import com.gci.pickem.model.UserConfirmationView;
+import com.gci.pickem.model.UserCreationRequest;
 import com.gci.pickem.model.UserView;
+import com.gci.pickem.service.picks.PickService;
 import com.gci.pickem.service.user.UserService;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,14 +20,18 @@ import javax.servlet.http.HttpServletRequest;
 
 @RestController
 public class UserController {
+    private static final Logger log = LoggerFactory.getLogger(UserController.class);
 
     private UserService userService;
+    private PickService pickService;
 
     @Autowired
     UserController(
-        UserService userService
+        UserService userService,
+        PickService pickService
     ) {
         this.userService = userService;
+        this.pickService = pickService;
     }
 
     @GetMapping("api/v1/user/{id}")
@@ -40,6 +51,32 @@ public class UserController {
         return userView;
     }
 
+    @GetMapping("api/v1/user/sendEmail")
+    @PreAuthorize("hasAuthority('USER')")
+    public void sendEmail() {
+        pickService.notifyUsersWithoutPicks();
+    }
+
+    @PostMapping("/api/v1/user/register")
+    public void registerUser(@RequestBody UserCreationRequest request, @RequestParam(value = "poolCode", required = false) String poolCode) {
+        if (StringUtils.isNotBlank(poolCode)) {
+            log.info("Processing user registration request for pool with code {}", poolCode);
+        }
+
+        userService.createUser(request);
+    }
+
+    @PostMapping("/api/v1/user/confirm")
+    public void confirmUser(@RequestBody UserConfirmationView confirmView) {
+        userService.confirmUser(confirmView);
+    }
+
+    @PostMapping("/api/v1/user/forgot-password")
+    public void forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        // Consider how to prevent this from being spammed maliciously, as it sends an email each time!
+        userService.userForgotPassword(request);
+    }
+
     @ExceptionHandler(InvalidUserAccessException.class)
     @ResponseStatus(value = HttpStatus.FORBIDDEN)
     public void handleInvalidUserAccess() {
@@ -50,10 +87,5 @@ public class UserController {
     @ResponseStatus(value = HttpStatus.NOT_FOUND)
     public void handleUserNotFound() {
         // Nothing to do.
-    }
-
-    @PostMapping("api/v1/user")
-    public UserView createUser(@RequestBody UserView userView) {
-        return userService.createUser(userView);
     }
 }

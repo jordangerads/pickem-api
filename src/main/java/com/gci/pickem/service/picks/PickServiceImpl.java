@@ -9,13 +9,17 @@ import com.gci.pickem.repository.UserRepository;
 import com.gci.pickem.model.ScoringMethod;
 import com.gci.pickem.repository.PickRepository;
 import com.gci.pickem.repository.PoolRepository;
+import com.gci.pickem.service.mail.MailService;
+import com.gci.pickem.service.mail.SendEmailRequest;
 import com.gci.pickem.service.schedule.ScheduleService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -29,6 +33,7 @@ public class PickServiceImpl implements PickService {
     private PoolRepository poolRepository;
     private UserRepository userRepository;
     private ScheduleService scheduleService;
+    private MailService mailService;
 
     @Autowired
     PickServiceImpl(
@@ -36,13 +41,15 @@ public class PickServiceImpl implements PickService {
         GameRepository gameRepository,
         PoolRepository poolRepository,
         UserRepository userRepository,
-        ScheduleService scheduleService
+        ScheduleService scheduleService,
+        MailService mailService
     ) {
         this.pickRepository = pickRepository;
         this.gameRepository = gameRepository;
         this.poolRepository = poolRepository;
         this.userRepository = userRepository;
         this.scheduleService = scheduleService;
+        this.mailService = mailService;
     }
 
     @Override
@@ -124,6 +131,112 @@ public class PickServiceImpl implements PickService {
         }
     }
 
+    @Override
+    @Transactional
+    public void notifyUsersWithoutPicks() {
+        notifyUsersWithoutPicks(LocalDate.now(ZoneId.of("America/Chicago")));
+    }
+
+    void notifyUsersWithoutPicks(LocalDate today) {
+        LocalTime midnight = LocalTime.MIDNIGHT;
+        LocalDateTime todayMidnight = LocalDateTime.of(today, midnight);
+        LocalDateTime tomorrowMidnight = todayMidnight.plusDays(1);
+
+        // Find all games
+        List<Game> games =
+            gameRepository.findByGameTimeBetween(
+                todayMidnight.toInstant(ZoneOffset.UTC),
+                tomorrowMidnight.toInstant(ZoneOffset.UTC));
+
+        if (games.isEmpty()) {
+            // There are no games in this 24-hour period, no alerts need to be sent out.
+            return;
+        }
+
+        List<Long> gameIds = games.stream().map(Game::getGameId).collect(Collectors.toList());
+
+        // Find all users in pools who haven't made picks for the given games
+        Set<Object[]> usersMissingPicks = userRepository.getUsersWithMissingPicks(gameIds, gameIds.size());
+
+        // This could get expensive later. Watch out.
+        Map<Long, Pool> poolCache = new HashMap<>();
+
+        List<SendEmailRequest> requests = new ArrayList<>();
+        for (Object[] result : usersMissingPicks) {
+            try {
+                Long userId = (Long) result[0];
+                Long poolId = (Long) result[1];
+
+                User user = userRepository.findOne(userId);
+                validateUserValidForPool(user.getUserId(), poolId);
+
+                // User belongs to pool.
+                Pool pool = getPool(poolId, poolCache);
+
+                SendEmailRequest request = new SendEmailRequest();
+                request.setRecipientName(user.getFirstName());
+                request.setRecipientEmail(user.getEmail());
+
+                Map<String, Object> requestData = new HashMap<>();
+                requestData.put("poolName", pool.getPoolName());
+
+                Game game = games.get(0);
+                Set<Pick> picks = pickRepository.getPicks(userId, poolId, game.getSeason(), game.getWeek());
+
+                // Start by assuming they're missing everything.
+                Set<Long> missingPickGameIds = new HashSet<>(gameIds);
+                if (!picks.isEmpty()) {
+                    // Remove any games that the user has a saved pick for.
+                    missingPickGameIds.removeAll(
+                        picks.stream()
+                            .filter(pick -> gameIds.contains(pick.getGameId()) && pick.getConfidence() != null)
+                            .map(Pick::getGameId)
+                            .collect(Collectors.toList()));
+                }
+
+                Iterable<Game> gamesNeedingPicks = gameRepository.findAll(missingPickGameIds);
+                List<Map<String, String>> missingGames = new ArrayList<>();
+                for (Game needingPick : gamesNeedingPicks) {
+                    Map<String, String> missingGame = new HashMap<>();
+
+                    missingGame.put("awayTeamName", needingPick.getAwayTeam().getTeamName());
+                    missingGame.put("homeTeamName", needingPick.getHomeTeam().getTeamName());
+                    missingGame.put("gameTime", needingPick.getGameTime().toString());
+
+                    missingGames.add(missingGame);
+                }
+
+                requestData.put("missingGames", missingGames);
+
+                request.setRequestData(requestData);
+
+                requests.add(request);
+            } catch (Exception e) {
+                log.error("{}", e);
+            }
+
+            mailService.sendEmails(requests);
+        }
+
+        log.info("" + games.size());
+    }
+
+    private Pool getPool(Long poolId, Map<Long, Pool> cache) {
+        Pool pool = cache.get(poolId);
+        if (pool != null) {
+            return pool;
+        }
+
+        pool = poolRepository.findOne(poolId);
+        if (pool == null) {
+            throw new RuntimeException(String.format("Unable to find pool by ID %d", poolId));
+        }
+
+        cache.put(poolId, pool);
+
+        return pool;
+    }
+
     private int getWeek(List<GamePick> picks) {
         Set<Long> gameIds = picks.stream().map(GamePick::getGameId).collect(Collectors.toSet());
 
@@ -152,7 +265,7 @@ public class PickServiceImpl implements PickService {
         return seasons.iterator().next();
     }
 
-    void validatePicksValidForPool(Long poolId, List<GamePick> picks) {
+    private void validatePicksValidForPool(Long poolId, List<GamePick> picks) {
         if (poolId == null) {
             throw new RuntimeException("No pool ID provided for pick submission request.");
         }
