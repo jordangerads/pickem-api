@@ -46,6 +46,7 @@ public class MailServiceImpl implements MailService {
     public void sendEmail(SendEmailRequest request) {
         SendWithUsSendRequest swuRequest = new SendWithUsSendRequest();
 
+        swuRequest.setEmailId(request.getTemplateId());
         swuRequest.setRecipient(ImmutableMap.of("name", request.getRecipientName(), "address", request.getRecipientEmail()));
         swuRequest.setEmailData(request.getRequestData());
 

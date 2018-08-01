@@ -1,11 +1,12 @@
 package com.gci.pickem.config;
 
+import com.gci.pickem.config.filter.JWTAuthenticationFilter;
+import com.gci.pickem.config.filter.JWTAuthorizationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
@@ -21,7 +22,6 @@ import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
 import org.springframework.security.oauth2.provider.token.store.JwtTokenStore;
-import org.springframework.security.oauth2.provider.token.store.KeyStoreKeyFactory;
 
 @Configuration
 @EnableWebSecurity
@@ -36,6 +36,9 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Value("${security.keystore-pass}")
     private String keystorePass;
+
+    @Value("${security.signing-key}")
+    private String signingKey;
 
     private UserDetailsService userDetailsService;
 
@@ -59,14 +62,18 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         http
             .authorizeRequests()
-                .antMatchers("/api/v1/register").permitAll()
+                .antMatchers("/api/v1/user/register").permitAll()
+                .antMatchers("/api/v1/user/confirm").permitAll()
+                .antMatchers("/api/v1/user/forgot-password").permitAll()
                 .anyRequest().authenticated()
                 .and()
             .cors()
                 .and()
             .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
-            .csrf().disable();
+            .csrf().disable()
+            .addFilter(new JWTAuthenticationFilter(authenticationManager(), signingKey))
+            .addFilter(new JWTAuthorizationFilter(authenticationManager(), signingKey));
     }
 
     @Bean
@@ -86,8 +93,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     public JwtAccessTokenConverter accessTokenConverter() {
         JwtAccessTokenConverter converter = new JwtAccessTokenConverter();
 
-        KeyStoreKeyFactory keyStoreKeyFactory = new KeyStoreKeyFactory(new ClassPathResource("pickem.jks"), keystorePass.toCharArray());
-        converter.setKeyPair(keyStoreKeyFactory.getKeyPair("pickem"));
+        converter.setSigningKey(signingKey);
 
         return converter;
     }

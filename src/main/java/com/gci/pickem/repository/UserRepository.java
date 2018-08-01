@@ -12,6 +12,8 @@ public interface UserRepository extends CrudRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
 
+    Optional<User> findByRegistrationCode(String registrationCode);
+
     @Query(
         value =
             "(select user_id, pool_id from user_pool) " +

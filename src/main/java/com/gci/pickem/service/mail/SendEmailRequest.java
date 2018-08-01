@@ -5,6 +5,7 @@ import java.util.Map;
 public class SendEmailRequest {
     private String recipientName;
     private String recipientEmail;
+    private String templateId;
     private Map<String, Object> requestData;
 
     public String getRecipientName() {
@@ -21,6 +22,14 @@ public class SendEmailRequest {
 
     public void setRecipientEmail(String recipientEmail) {
         this.recipientEmail = recipientEmail;
+    }
+
+    public String getTemplateId() {
+        return templateId;
+    }
+
+    public void setTemplateId(String templateId) {
+        this.templateId = templateId;
     }
 
     public Map<String, Object> getRequestData() {
