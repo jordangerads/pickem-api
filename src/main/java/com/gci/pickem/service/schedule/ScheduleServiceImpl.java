@@ -15,9 +15,18 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.*;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAccessor;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +35,8 @@ public class ScheduleServiceImpl implements ScheduleService {
     private MySportsFeedsService mySportsFeedsService;
     private TeamService teamService;
     private GamesService gamesService;
+
+    private static final Pattern GAME_TIME_PATTERN = Pattern.compile("(1?[0-9]):([0-5][0-9])([AP]M)");
 
     @Autowired
     ScheduleServiceImpl(
@@ -45,12 +56,9 @@ public class ScheduleServiceImpl implements ScheduleService {
             // Games don't yet exist. Grab the data from MSF.
             FullGameSchedule schedule = mySportsFeedsService.getGamesForSeasonAndWeek(season, week);
 
-            List<GameEntry> weekEntries =
-                schedule.getGameEntries().stream()
-                .filter(entry -> entry.getWeek().equals(week))
-                .collect(Collectors.toList());
-
-            List<Game> newGames = processNewData(weekEntries);
+            // Add ALL of the games from the requested schedule to the database.
+            // Return only those for the requested week.
+            List<Game> newGames = processNewData(schedule.getGameEntries());
             List<com.gci.pickem.model.Game> games =
                 newGames.stream()
                     .filter(entry -> entry.getWeek().equals(week))
@@ -68,7 +76,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         com.gci.pickem.model.Game model = new com.gci.pickem.model.Game();
 
         model.setGameId(game.getGameId());
-        model.setGameTime(LocalDateTime.ofInstant(game.getGameTime(), ZoneId.systemDefault()));
+        model.setGameTime(LocalDateTime.ofInstant(Instant.ofEpochMilli(game.getGameTimeEpoch()), ZoneId.of("America/New_York")));
 
         model.setHomeTeam(new TeamView(teamService.findById(game.getHomeTeamId())));
         model.setAwayTeam(new TeamView(teamService.findById(game.getAwayTeamId())));
@@ -90,6 +98,47 @@ public class ScheduleServiceImpl implements ScheduleService {
         return games;
     }
 
+    private long getUtcGameTime(GameEntry gameEntry) {
+        String date = gameEntry.getDate();
+        String time = get24HourTime(gameEntry.getTime());
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        TemporalAccessor temporalAccessor = formatter.parse(String.format("%s %s", date, time));
+        LocalDateTime localDateTime = LocalDateTime.from(temporalAccessor);
+        ZonedDateTime zonedDateTime = ZonedDateTime.of(localDateTime, ZoneId.of("America/New_York"));
+        return Instant.from(zonedDateTime).toEpochMilli();
+    }
+
+    String get24HourTime(String time) {
+        Matcher m = GAME_TIME_PATTERN.matcher(time);
+        if (!m.matches()) {
+            throw new RuntimeException(String.format("Unexpected game time format: %s", time));
+        }
+
+        String militaryTime = "";
+
+        String hour = m.group(1);
+
+        String timeOfDay = m.group(3);
+        if ("PM".equals(timeOfDay) && !"12".equals(hour)) {
+            militaryTime += Integer.toString(Integer.parseInt(hour) + 12);
+        } else if ("AM".equals(timeOfDay) && "12".equals(hour)) {
+            militaryTime += "00";
+        } else {
+            Integer intHour = Integer.parseInt(hour);
+            if (intHour < 10) {
+                militaryTime += "0";
+            }
+
+            militaryTime += hour;
+        }
+
+        militaryTime += ":" + m.group(2);
+
+        return militaryTime;
+    }
+
     private Game processGame(GameEntry entry) {
         com.gci.pickem.data.Game game = gamesService.findByExternalId(entry.getId());
 
@@ -100,11 +149,14 @@ public class ScheduleServiceImpl implements ScheduleService {
         // Game isn't in the DB yet.
         game = new com.gci.pickem.data.Game();
 
-        game.setSeason(SeasonUtil.getSeasonForDate(entry.getDate().toInstant()));
+        long gameTimeEpoch = getUtcGameTime(entry);
+        Instant gameTime = Instant.ofEpochMilli(gameTimeEpoch);
+
+        game.setSeason(SeasonUtil.getSeasonForDate(gameTime));
         game.setWeek(entry.getWeek());
         game.setExternalId(entry.getId());
 
-        game.setGameTime(entry.getDate().toInstant());
+        game.setGameTimeEpoch(getUtcGameTime(entry));
 
         com.gci.pickem.data.Team away = teamService.findByExternalId((long) entry.getAwayTeam().getId());
         game.setAwayTeamId(away.getTeamId());
@@ -113,9 +165,11 @@ public class ScheduleServiceImpl implements ScheduleService {
         game.setHomeTeamId(home.getTeamId());
 
         // Check if the game has been finalized.
-        GameScore score = mySportsFeedsService.getGameScore(entry.getDate().toInstant(), entry.getId());
+        GameScore score = mySportsFeedsService.getGameScore(gameTime, entry.getId());
         game.setGameComplete(Boolean.valueOf(score.getIsCompleted()));
-        game.setWinningTeamId(score.getHomeScore().compareTo(score.getAwayScore()) > 0 ? home.getTeamId() : away.getTeamId());
+        if (game.getGameComplete()) {
+            game.setWinningTeamId(score.getHomeScore().compareTo(score.getAwayScore()) > 0 ? home.getTeamId() : away.getTeamId());
+        }
 
         // This needs to be transactional here!
         return gamesService.saveGame(game);

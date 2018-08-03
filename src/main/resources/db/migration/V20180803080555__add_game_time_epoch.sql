@@ -1,0 +1,1 @@
+alter table game add column game_time_epoch bigint;

@@ -1,11 +1,7 @@
 package com.gci.pickem.model.mysportsfeeds;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonGetter;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
-
-import java.util.Date;
 
 public class GameEntry {
 
@@ -14,16 +10,14 @@ public class GameEntry {
     private Integer week;
     private String scheduleStatus;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
-    private Date originalDate;
+    private String originalDate;
 
     // e.g. "1:00PM"
     private String originalTime;
 
     private String delayedOrPostponedReason;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
-    private Date date;
+    private String date;
 
     // e.g. "1:00PM"
     private String time;
@@ -64,11 +58,11 @@ public class GameEntry {
         this.scheduleStatus = scheduleStatus;
     }
 
-    public Date getOriginalDate() {
+    public String getOriginalDate() {
         return originalDate;
     }
 
-    public void setOriginalDate(Date originalDate) {
+    public void setOriginalDate(String originalDate) {
         this.originalDate = originalDate;
     }
 
@@ -88,11 +82,11 @@ public class GameEntry {
         this.delayedOrPostponedReason = delayedOrPostponedReason;
     }
 
-    public Date getDate() {
+    public String getDate() {
         return date;
     }
 
-    public void setDate(Date date) {
+    public void setDate(String date) {
         this.date = date;
     }
 

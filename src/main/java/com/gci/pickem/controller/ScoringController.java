@@ -19,7 +19,7 @@ public class ScoringController {
     }
 
     // At some point this will grab the currently-logged-in user to return the score!
-    @GetMapping(value = "api/v1/score")
+    @GetMapping(value = "'api/v1/score")
     public Integer getScore(@RequestParam("season") Integer season,
                               @RequestParam("week") Integer week,
                               @RequestParam("userId") Long userId,
