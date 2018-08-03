@@ -15,8 +15,11 @@ public final class Game {
     private TeamView homeTeam;
     private TeamView awayTeam;
 
+    @Deprecated
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm")
     private LocalDateTime gameTime;
+
+    private Long gameTimeEpoch;
 
     public long getGameId() {
         return gameId;
@@ -48,5 +51,13 @@ public final class Game {
 
     public void setGameTime(LocalDateTime gameTime) {
         this.gameTime = gameTime;
+    }
+
+    public Long getGameTimeEpoch() {
+        return gameTimeEpoch;
+    }
+
+    public void setGameTimeEpoch(Long gameTimeEpoch) {
+        this.gameTimeEpoch = gameTimeEpoch;
     }
 }

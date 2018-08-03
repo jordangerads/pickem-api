@@ -3,13 +3,14 @@ package com.gci.pickem.service.picks;
 import com.gci.pickem.data.*;
 import com.gci.pickem.model.GamePick;
 import com.gci.pickem.model.UserPicksRequest;
-import com.gci.pickem.model.WeekGames;
+import com.gci.pickem.model.GamesList;
 import com.gci.pickem.repository.GameRepository;
 import com.gci.pickem.repository.UserRepository;
 import com.gci.pickem.model.ScoringMethod;
 import com.gci.pickem.repository.PickRepository;
 import com.gci.pickem.repository.PoolRepository;
 import com.gci.pickem.service.mail.MailService;
+import com.gci.pickem.service.mail.MailType;
 import com.gci.pickem.service.mail.SendEmailRequest;
 import com.gci.pickem.service.schedule.ScheduleService;
 import org.apache.commons.collections4.CollectionUtils;
@@ -121,16 +122,16 @@ public class PickServiceImpl implements PickService {
             throw new RuntimeException(String.format("No scoring method found for pool with ID %d", poolId));
         }
 
-        WeekGames weekGames = scheduleService.getGamesForSeasonAndWeek(season, week);
+        GamesList gamesList = scheduleService.getGamesForSeasonAndWeek(season, week);
 
         switch (method) {
             case ABSOLUTE:
-                return Collections.nCopies(weekGames.getGames().size(), 1);
+                return Collections.nCopies(gamesList.getGames().size(), 1);
             case SIXTEEN_DOWN:
                 List<Integer> values = new ArrayList<>();
 
                 int nextVal = 16;
-                for (Iterator<com.gci.pickem.model.Game> iter = weekGames.getGames().iterator(); iter.hasNext(); iter.next()) {
+                for (Iterator<com.gci.pickem.model.Game> iter = gamesList.getGames().iterator(); iter.hasNext(); iter.next()) {
                     values.add(nextVal--);
                 }
 
@@ -142,11 +143,11 @@ public class PickServiceImpl implements PickService {
 
     @Override
     @Transactional
-    public void notifyUsersWithoutPicks() {
-        notifyUsersWithoutPicks(LocalDate.now(ZoneId.of("America/Chicago")));
-    }
+    public void notifyUsersWithoutPicks(LocalDate today) {
+        if (today == null) {
+            today = LocalDate.now(ZoneId.of("America/New_York"));
+        }
 
-    void notifyUsersWithoutPicks(LocalDate today) {
         LocalTime midnight = LocalTime.MIDNIGHT;
         LocalDateTime todayMidnight = LocalDateTime.of(today, midnight);
         LocalDateTime tomorrowMidnight = todayMidnight.plusDays(1);
@@ -173,8 +174,8 @@ public class PickServiceImpl implements PickService {
         List<SendEmailRequest> requests = new ArrayList<>();
         for (Object[] result : usersMissingPicks) {
             try {
-                Long userId = (Long) result[0];
-                Long poolId = (Long) result[1];
+                Long userId = new Long((Integer) result[0]);
+                Long poolId = new Long((Integer) result[1]);
 
                 User user = userRepository.findOne(userId);
                 validateUserValidForPool(user.getUserId(), poolId);
@@ -185,9 +186,11 @@ public class PickServiceImpl implements PickService {
                 SendEmailRequest request = new SendEmailRequest();
                 request.setRecipientName(user.getFirstName());
                 request.setRecipientEmail(user.getEmail());
+                request.setTemplateId(MailType.PICKS_REMINDER.getTemplateId());
 
                 Map<String, Object> requestData = new HashMap<>();
                 requestData.put("poolName", pool.getPoolName());
+                requestData.put("firstName", user.getFirstName());
 
                 Game game = games.get(0);
                 Set<Pick> picks = pickRepository.getPicks(userId, poolId, game.getSeason(), game.getWeek());
@@ -210,7 +213,7 @@ public class PickServiceImpl implements PickService {
 
                     missingGame.put("awayTeamName", needingPick.getAwayTeam().getTeamName());
                     missingGame.put("homeTeamName", needingPick.getHomeTeam().getTeamName());
-                    missingGame.put("gameTime", Instant.ofEpochMilli(needingPick.getGameTimeEpoch()).toString());
+                    missingGame.put("gameTime", Instant.ofEpochSecond(needingPick.getGameTimeEpoch()).toString());
 
                     missingGames.add(missingGame);
                 }

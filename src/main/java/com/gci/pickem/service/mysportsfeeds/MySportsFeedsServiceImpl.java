@@ -1,11 +1,8 @@
 package com.gci.pickem.service.mysportsfeeds;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gci.pickem.model.mysportsfeeds.FullGameSchedule;
-import com.gci.pickem.model.mysportsfeeds.FullGameScheduleResponse;
-import com.gci.pickem.model.mysportsfeeds.GameScore;
-import com.gci.pickem.model.mysportsfeeds.ScoreboardResponse;
-import com.gci.pickem.util.SeasonUtil;
+import com.gci.pickem.model.mysportsfeeds.*;
+import com.gci.pickem.util.ScheduleUtil;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -49,6 +46,7 @@ public class MySportsFeedsServiceImpl implements MySportsFeedsService {
     private String dataFormat;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private final CacheLoader<String, String> cacheLoader = new CacheLoader<String, String>() {
         @Override
@@ -79,18 +77,30 @@ public class MySportsFeedsServiceImpl implements MySportsFeedsService {
 
     private final LoadingCache<String, String> requestCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build(cacheLoader);
 
-    @Override
-    public FullGameSchedule getGamesForSeasonAndWeek(int season, int week) {
+    private String getScheduleUrl(int season) {
+        return getUrl(season, MySportsFeedEndpoint.FULL_GAME_SCHEDULE);
+    }
+
+    private String getScoreboardUrl(int season) {
+        return getUrl(season, MySportsFeedEndpoint.SCOREBOARD);
+    }
+
+    private String getUrl(int season, MySportsFeedEndpoint endpoint) {
+        return String.format("%s/%s/pull/nfl/%s/%s.%s", baseUrl, apiVersion, getRequestYear(season), endpoint.getValue(), dataFormat);
+    }
+
+    private String getRequestYear(int season) {
         // If they send 2018, assume they meant 2018-2019 season. Anything past the current year, default to current.
-        String requestYear =
+        return
             Calendar.getInstance().get(Calendar.YEAR) < season ?
                 "current" :
                 String.format("%d-%d-regular", season, season + 1);
+    }
 
-        String url =
-            String.format("%s/%s/pull/nfl/%s/full_game_schedule.%s", baseUrl, apiVersion, requestYear, dataFormat);
+    @Override
+    public FullGameSchedule getGamesForSeasonAndWeek(int season, int week) {
+        FullGameScheduleResponse response = getResponse(String.format("%s?week=%d", getScheduleUrl(season), week), FullGameScheduleResponse.class);
 
-        FullGameScheduleResponse response = getResponse(url, FullGameScheduleResponse.class);
         if (response == null) {
             throw new RuntimeException(
                 String.format("No response retrieved for full game schedule request for season %d and week %d", season, week));
@@ -100,20 +110,51 @@ public class MySportsFeedsServiceImpl implements MySportsFeedsService {
     }
 
     @Override
+    public FullGameSchedule getGamesUntilDaysFromNow(int days) {
+        int season = ScheduleUtil.getSeasonForDate(Instant.now());
+        FullGameScheduleResponse response =
+            getResponse(
+                String.format("%s?date=until-%d-days-from-now", getScheduleUrl(season), days),
+                FullGameScheduleResponse.class);
+
+        if (response == null) {
+            throw new RuntimeException(
+                String.format("No response retrieved for full game schedule request for season %d", season));
+        }
+
+        return response.getFullGameSchedule();
+    }
+
+    @Override
+    public Scoreboard getFinalGameScores(Instant date) {
+        String dateStr = DATE_TIME_FORMATTER.format(date.atZone(ZoneId.of("America/New_York")));
+        ScoreboardResponse response =
+            getResponse(
+                String.format(
+                    "%s?fordate=%s&status=final",
+                    getScoreboardUrl(ScheduleUtil.getSeasonForDate(date)),
+                    dateStr),
+                ScoreboardResponse.class);
+
+        if (response == null) {
+            throw new RuntimeException(
+                String.format("No response retrieved for scoreboard request for date %s", dateStr));
+        }
+
+        return response.getScoreboard();
+    }
+
+    @Override
     public GameScore getGameScore(Instant instant, Integer msfGameId) {
-        int season = SeasonUtil.getSeasonForDate(instant);
-        String requestYear = String.format("%d-%d-regular", season, season + 1);
+        String dateStr = DATE_TIME_FORMATTER.format(instant.atZone(ZoneId.of("America/New_York")));
+        ScoreboardResponse response =
+            getResponse(
+                String.format(
+                    "%s?fordate=%s&status=final",
+                    getScoreboardUrl(ScheduleUtil.getSeasonForDate(instant)),
+                    dateStr),
+                ScoreboardResponse.class);
 
-        DateTimeFormatter formatter =
-            DateTimeFormatter.ofPattern("yyyyMMdd");
-
-        String url =
-            String.format(
-                "https://api.mysportsfeeds.com/v1.2/pull/nfl/%s/scoreboard.json?fordate=%s",
-                requestYear,
-                formatter.format(instant.atZone(ZoneId.of("America/New_York"))));
-
-        ScoreboardResponse response = getResponse(url, ScoreboardResponse.class);
         if (response == null || response.getScoreboard() == null) {
             throw new RuntimeException(String.format("No response retrieved for scoreboard request for date %s and game ID %d", instant.toString(), msfGameId));
         }
@@ -137,6 +178,7 @@ public class MySportsFeedsServiceImpl implements MySportsFeedsService {
 
     private <T> T getResponse(String url, Class<T> clazz) {
         try {
+            log.debug("Executing request to {}", url);
             return MAPPER.readValue(requestCache.get(url), clazz);
         } catch (ExecutionException | IOException e) {
             log.trace("", e);

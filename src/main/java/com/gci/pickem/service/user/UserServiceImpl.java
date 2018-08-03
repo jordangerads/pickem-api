@@ -57,6 +57,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public UserView getUserByUsername(String username) {
+        Optional<User> user = userRepository.findByEmail(username);
+        return user.map(UserView::new).orElse(null);
+    }
+
+    @Override
     @Transactional
     public void createUser(UserCreationRequest request) {
         if (!userCreateRequestIsValid(request)) {

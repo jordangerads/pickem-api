@@ -21,6 +21,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,7 +29,7 @@ import java.util.stream.Collectors;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
-public class PicksServiceImplTest {
+public class PickServiceImplTest {
 
     @Mock private PickRepository pickRepository;
     @Mock private GameRepository gameRepository;
@@ -183,7 +184,9 @@ public class PicksServiceImplTest {
             mockGames.put(game.getGameId(), game);
         }
 
-        when(gameRepository.findByGameTimeBetween(eq(first.toInstant(ZoneOffset.UTC)), eq(second.toInstant(ZoneOffset.UTC)))).thenReturn(Lists.newArrayList(mockGames.values()));
+        when(gameRepository.findByGameTimeEpochBetween(
+                eq(first.atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli()),
+                eq(second.atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli()))).thenReturn(Lists.newArrayList(mockGames.values()));
 
         when(gameRepository.findAll(anyCollectionOf(Long.class))).thenAnswer(invocation -> {
             Set<Long> gameIds = (Set<Long>) invocation.getArgumentAt(0, Collection.class);
@@ -202,9 +205,9 @@ public class PicksServiceImplTest {
         when(userRepository.getUsersWithMissingPicks(eq(gameIds), eq(2))).thenAnswer(invocation -> {
             Set<Object[]> results = new HashSet<>();
 
-            results.add(new Object[] { 4L, 1L });
-            results.add(new Object[] { 15L, 1L });
-            results.add(new Object[] { 16L, 3L });
+            results.add(new Object[] { 4, 1 });
+            results.add(new Object[] { 15, 1 });
+            results.add(new Object[] { 16, 3 });
 
             return results;
         });
@@ -222,8 +225,9 @@ public class PicksServiceImplTest {
         Assert.assertEquals("John@Locke.com", john.getRecipientEmail());
 
         Map<String, Object> data = john.getRequestData();
-        Assert.assertEquals(2, data.size());
+        Assert.assertEquals(3, data.size());
         Assert.assertEquals("Test Pool 3", data.get("poolName"));
+        Assert.assertEquals("John", data.get("firstName"));
 
         List<Map<String, Object>> missingGames = (List) data.get("missingGames");
         Assert.assertEquals(1, missingGames.size());
@@ -231,7 +235,7 @@ public class PicksServiceImplTest {
         Map<String, Object> game = missingGames.get(0);
         Assert.assertEquals("Vikings", game.get("awayTeamName"));
         Assert.assertEquals("Bears", game.get("homeTeamName"));
-        Assert.assertEquals("2018-07-28T12:00:00Z", game.get("gameTime"));
+        Assert.assertEquals("2018-07-28T16:00:00Z", game.get("gameTime"));
 
         // Jack next.
         optional = emailRequests.stream().filter(req -> "Jack".equals(req.getRecipientName())).findFirst();
@@ -241,8 +245,9 @@ public class PicksServiceImplTest {
         Assert.assertEquals("Jack@Shepherd.com", jack.getRecipientEmail());
 
         data = jack.getRequestData();
-        Assert.assertEquals(2, data.size());
+        Assert.assertEquals(3, data.size());
         Assert.assertEquals("Test Pool 1", data.get("poolName"));
+        Assert.assertEquals("Jack", data.get("firstName"));
 
         missingGames = (List) data.get("missingGames");
         Assert.assertEquals(2, missingGames.size());
@@ -250,12 +255,12 @@ public class PicksServiceImplTest {
         game = missingGames.stream().filter(pick -> "Packers".equals(pick.get("awayTeamName"))).findFirst().get();
         Assert.assertEquals("Packers", game.get("awayTeamName"));
         Assert.assertEquals("Lions", game.get("homeTeamName"));
-        Assert.assertEquals("2018-07-28T17:00:00Z", game.get("gameTime"));
+        Assert.assertEquals("2018-07-28T21:00:00Z", game.get("gameTime"));
 
         game = missingGames.stream().filter(pick -> "Vikings".equals(pick.get("awayTeamName"))).findFirst().get();
         Assert.assertEquals("Vikings", game.get("awayTeamName"));
         Assert.assertEquals("Bears", game.get("homeTeamName"));
-        Assert.assertEquals("2018-07-28T12:00:00Z", game.get("gameTime"));
+        Assert.assertEquals("2018-07-28T16:00:00Z", game.get("gameTime"));
 
         // Hugo last!
         optional = emailRequests.stream().filter(req -> "Hugo".equals(req.getRecipientName())).findFirst();
@@ -265,8 +270,9 @@ public class PicksServiceImplTest {
         Assert.assertEquals("Hugo@Reyes.com", hugo.getRecipientEmail());
 
         data = hugo.getRequestData();
-        Assert.assertEquals(2, data.size());
+        Assert.assertEquals(3, data.size());
         Assert.assertEquals("Test Pool 1", data.get("poolName"));
+        Assert.assertEquals("Hugo", data.get("firstName"));
 
         missingGames = (List) data.get("missingGames");
         Assert.assertEquals(1, missingGames.size());
@@ -274,7 +280,7 @@ public class PicksServiceImplTest {
         game = missingGames.get(0);
         Assert.assertEquals("Packers", game.get("awayTeamName"));
         Assert.assertEquals("Lions", game.get("homeTeamName"));
-        Assert.assertEquals("2018-07-28T17:00:00Z", game.get("gameTime"));
+        Assert.assertEquals("2018-07-28T21:00:00Z", game.get("gameTime"));
     }
 
     private void setupPickMocks() {
@@ -326,7 +332,7 @@ public class PicksServiceImplTest {
         first.getHomeTeam().setTeamName("Bears");
 
         LocalDateTime firstTime = LocalDateTime.of(2018, 7, 28, 12, 0, 0, 0);
-        first.setGameTime(firstTime.toInstant(ZoneOffset.UTC));
+        first.setGameTimeEpoch(firstTime.atZone(ZoneId.of("America/New_York")).toInstant().getEpochSecond());
 
         first.setHomeTeamId(2L);
         first.setGameId(1L);
@@ -342,7 +348,7 @@ public class PicksServiceImplTest {
         second.getHomeTeam().setTeamName("Lions");
 
         LocalDateTime secondTime = LocalDateTime.of(2018, 7, 28, 17, 0, 0, 0);
-        second.setGameTime(secondTime.toInstant(ZoneOffset.UTC));
+        second.setGameTimeEpoch(secondTime.atZone(ZoneId.of("America/New_York")).toInstant().getEpochSecond());
 
         second.setAwayTeamId(3L);
         second.setHomeTeamId(4L);

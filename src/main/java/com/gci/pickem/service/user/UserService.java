@@ -9,6 +9,8 @@ public interface UserService {
 
     UserView getUserById(Long id);
 
+    UserView getUserByUsername(String username);
+
     void createUser(UserCreationRequest user);
 
     void confirmUser(UserConfirmationView confirmationView);

@@ -34,6 +34,11 @@ public class GamesServiceImpl implements GamesService {
     }
 
     @Override
+    public Game findById(Long id) {
+        return gameRepository.findOne(id);
+    }
+
+    @Override
     public Collection<Game> findAllBySeasonAndWeek(int season, int week) {
         return gameRepository.findAllBySeasonAndWeek(season, week);
     }
