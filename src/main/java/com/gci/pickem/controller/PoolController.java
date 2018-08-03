@@ -21,7 +21,7 @@ public class PoolController {
     }
 
     // In the future, we will be able to get the creator of the pool and stuff from the authentication object.
-    @PostMapping("api/v1/pool")
+    @PostMapping("/api/v1/pool")
     public PoolView createPool(@RequestBody PoolCreateRequest createRequest) {
         return poolService.createPool(createRequest.getUserId(), createRequest.getPoolView());
     }

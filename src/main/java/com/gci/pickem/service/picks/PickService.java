@@ -6,7 +6,7 @@ import java.util.List;
 
 public interface PickService {
 
-    void saveUserPicks(UserPicksRequest request);
+    PickSubmissionResponse saveUserPicks(UserPicksRequest request);
 
     List<Integer> getConfidenceValues(Long poolId, Integer season, Integer week);
 

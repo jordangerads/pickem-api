@@ -39,6 +39,15 @@ public class MySportsFeedsServiceImpl implements MySportsFeedsService {
     @Value("${mysportsfeeds.password}")
     private String password;
 
+    @Value("${mysportsfeeds.url.base}")
+    private String baseUrl;
+
+    @Value("${mysportsfeeds.version.current}")
+    private String apiVersion;
+
+    @Value("${mysportsfeeds.format}")
+    private String dataFormat;
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final CacheLoader<String, String> cacheLoader = new CacheLoader<String, String>() {
@@ -72,13 +81,14 @@ public class MySportsFeedsServiceImpl implements MySportsFeedsService {
 
     @Override
     public FullGameSchedule getGamesForSeasonAndWeek(int season, int week) {
-        // If the request was for any year OTHER than the current year, assume they meant the year-to-(year+1) season!
+        // If they send 2018, assume they meant 2018-2019 season. Anything past the current year, default to current.
         String requestYear =
-            Calendar.getInstance().get(Calendar.YEAR) == season ?
+            Calendar.getInstance().get(Calendar.YEAR) < season ?
                 "current" :
                 String.format("%d-%d-regular", season, season + 1);
 
-        String url = String.format("https://api.mysportsfeeds.com/v1.2/pull/nfl/%s/full_game_schedule.json", requestYear);
+        String url =
+            String.format("%s/%s/pull/nfl/%s/full_game_schedule.%s", baseUrl, apiVersion, requestYear, dataFormat);
 
         FullGameScheduleResponse response = getResponse(url, FullGameScheduleResponse.class);
         if (response == null) {
@@ -95,13 +105,13 @@ public class MySportsFeedsServiceImpl implements MySportsFeedsService {
         String requestYear = String.format("%d-%d-regular", season, season + 1);
 
         DateTimeFormatter formatter =
-            DateTimeFormatter.ofPattern("yyyyMMdd").withZone( ZoneId.of("UTC") );
+            DateTimeFormatter.ofPattern("yyyyMMdd");
 
         String url =
             String.format(
                 "https://api.mysportsfeeds.com/v1.2/pull/nfl/%s/scoreboard.json?fordate=%s",
                 requestYear,
-                formatter.format(instant));
+                formatter.format(instant.atZone(ZoneId.of("America/New_York"))));
 
         ScoreboardResponse response = getResponse(url, ScoreboardResponse.class);
         if (response == null || response.getScoreboard() == null) {

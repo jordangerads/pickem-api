@@ -20,7 +20,7 @@ public class ScheduleController {
         this.scheduleService = scheduleService;
     }
 
-    @GetMapping("api/v1/games/season/{year}/week/{weekNum}")
+    @GetMapping("/api/v1/games/season/{year}/week/{weekNum}")
     public WeekGames getGamesByWeekOfYear(@PathVariable("year") Integer year, @PathVariable("weekNum") Integer week) {
         if (year == null) {
             throw new MissingRequiredDataException("Year must be provided");

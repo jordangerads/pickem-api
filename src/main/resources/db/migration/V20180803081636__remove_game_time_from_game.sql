@@ -1,0 +1,1 @@
+alter table game drop column game_time;

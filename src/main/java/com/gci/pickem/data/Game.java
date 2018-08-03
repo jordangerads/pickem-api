@@ -1,9 +1,6 @@
 package com.gci.pickem.data;
 
-import com.gci.pickem.util.TimestampConverter;
-
 import javax.persistence.*;
-import java.time.Instant;
 
 @Entity
 @Table(name = "game")
@@ -32,9 +29,8 @@ public class Game {
     @Column(name = "winning_team_id")
     private Long winningTeamId;
 
-    @Column(name = "game_time")
-    @Convert(converter = TimestampConverter.class)
-    private Instant gameTime;
+    @Column(name = "game_time_epoch")
+    private Long gameTimeEpoch;
 
     @Column(name = "external_game_id")
     private Integer externalId;
@@ -106,12 +102,12 @@ public class Game {
         this.winningTeamId = winningTeamId;
     }
 
-    public Instant getGameTime() {
-        return gameTime;
+    public Long getGameTimeEpoch() {
+        return gameTimeEpoch;
     }
 
-    public void setGameTime(Instant gameTime) {
-        this.gameTime = gameTime;
+    public void setGameTimeEpoch(Long gameTimeEpoch) {
+        this.gameTimeEpoch = gameTimeEpoch;
     }
 
     public Integer getExternalId() {

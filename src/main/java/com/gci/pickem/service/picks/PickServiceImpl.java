@@ -53,17 +53,23 @@ public class PickServiceImpl implements PickService {
     }
 
     @Override
-    public void saveUserPicks(UserPicksRequest request) {
+    public PickSubmissionResponse saveUserPicks(UserPicksRequest request) {
         if (request == null || request.getUserId() == null || request.getPoolId() == null ||
             CollectionUtils.isEmpty(request.getGamePicks())) {
-            log.info("Insufficient information received to record picks for user.");
-            return;
+            String msg = "Insufficient information received to record picks for user.";
+            log.info(msg);
+            throw new RuntimeException(msg);
         }
 
         List<GamePick> picks = request.getGamePicks();
 
         validateUserValidForPool(request.getUserId(), request.getPoolId());
-        validateGames(picks);
+        Map<Long, PickInvalidityReason> validityResults = validateGames(picks);
+        if (!validityResults.isEmpty()) {
+            // There are some invalid picks in the submission.
+            return new PickSubmissionResponse(validityResults);
+        }
+
         validatePicksValidForPool(request.getPoolId(), picks);
 
         // Everything appears to be valid. Let's save them picks!
@@ -98,6 +104,9 @@ public class PickServiceImpl implements PickService {
 
             pickRepository.save(existingPicks);
         }
+
+        // Success response.
+        return new PickSubmissionResponse();
     }
 
     @Override
@@ -144,9 +153,9 @@ public class PickServiceImpl implements PickService {
 
         // Find all games
         List<Game> games =
-            gameRepository.findByGameTimeBetween(
-                todayMidnight.toInstant(ZoneOffset.UTC),
-                tomorrowMidnight.toInstant(ZoneOffset.UTC));
+            gameRepository.findByGameTimeEpochBetween(
+                todayMidnight.atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli(),
+                tomorrowMidnight.atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli());
 
         if (games.isEmpty()) {
             // There are no games in this 24-hour period, no alerts need to be sent out.
@@ -201,7 +210,7 @@ public class PickServiceImpl implements PickService {
 
                     missingGame.put("awayTeamName", needingPick.getAwayTeam().getTeamName());
                     missingGame.put("homeTeamName", needingPick.getHomeTeam().getTeamName());
-                    missingGame.put("gameTime", needingPick.getGameTime().toString());
+                    missingGame.put("gameTime", Instant.ofEpochMilli(needingPick.getGameTimeEpoch()).toString());
 
                     missingGames.add(missingGame);
                 }
@@ -318,7 +327,7 @@ public class PickServiceImpl implements PickService {
      * Ensure that the correct number of games are provided in the picks and that all picks
      * span just one week.
      */
-    void validateGames(List<GamePick> picks) {
+    Map<Long, PickInvalidityReason> validateGames(List<GamePick> picks) {
         Set<Long> gameIds = picks.stream().map(GamePick::getGameId).collect(Collectors.toSet());
 
         if (gameIds.size() != picks.size()) {
@@ -341,6 +350,7 @@ public class PickServiceImpl implements PickService {
             gamesMap.put(game.getGameId(), game);
         }
 
+        Map<Long, PickInvalidityReason> invalidityReasons = new HashMap<>();
         for (GamePick gamePick : picks) {
             if (gamePick.getChosenTeamId() == null) {
                 // User hasn't specified a pick for this game. That's fine.
@@ -349,12 +359,23 @@ public class PickServiceImpl implements PickService {
 
             Game theGame = gamesMap.get(gamePick.getGameId());
             if (theGame == null) {
-                throw new RuntimeException(String.format("Received pick for game ID %d which isn't valid for game with week ID %d", gamePick.getGameId(), week));
+                log.warn("Received pick for game ID {} which isn't valid for game with week ID {}", gamePick.getGameId(), week);
+                invalidityReasons.put(gamePick.getGameId(), PickInvalidityReason.GAME_NOT_FOUND);
+                continue;
             }
 
             if (!gamePick.getChosenTeamId().equals(theGame.getHomeTeamId()) && !gamePick.getChosenTeamId().equals(theGame.getAwayTeamId())) {
-                throw new RuntimeException(String.format("User has selected team with ID %d in a game between teams with IDs %d and %d.", gamePick.getChosenTeamId(), theGame.getAwayTeamId(), theGame.getHomeTeamId()));
+                log.warn("User has selected team with ID {} in a game between teams with IDs {} and {}.", gamePick.getChosenTeamId(), theGame.getAwayTeamId(), theGame.getHomeTeamId());
+                invalidityReasons.put(gamePick.getGameId(), PickInvalidityReason.INVALID_CHOSEN_TEAM);
+            }
+
+            Instant now = Instant.now();
+            if (Instant.ofEpochMilli(theGame.getGameTimeEpoch()).isBefore(now)) {
+                log.warn("Non-zero confidence pick made for in-progress game with ID {}", gamePick.getGameId());
+                invalidityReasons.put(gamePick.getGameId(), PickInvalidityReason.GAME_STARTED);
             }
         }
+
+        return invalidityReasons;
     }
 }
