@@ -1,7 +1,5 @@
 package com.gci.pickem.config;
 
-import com.gci.pickem.config.filter.JWTAuthenticationFilter;
-import com.gci.pickem.config.filter.JWTAuthorizationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -34,9 +32,6 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Value("${security.security-realm}")
     private String securityRealm;
 
-    @Value("${security.keystore-pass}")
-    private String keystorePass;
-
     @Value("${security.signing-key}")
     private String signingKey;
 
@@ -49,7 +44,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Bean
     @Override
-    protected AuthenticationManager authenticationManager() throws Exception {
+    public AuthenticationManager authenticationManager() throws Exception {
         return super.authenticationManager();
     }
 
@@ -71,9 +66,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .and()
             .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
-            .csrf().disable()
-            .addFilter(new JWTAuthenticationFilter(authenticationManager(), signingKey))
-            .addFilter(new JWTAuthorizationFilter(authenticationManager(), signingKey));
+            .csrf().disable();
     }
 
     @Bean

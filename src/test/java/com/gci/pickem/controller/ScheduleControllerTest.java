@@ -2,7 +2,7 @@ package com.gci.pickem.controller;
 
 import com.gci.pickem.exception.MissingRequiredDataException;
 import com.gci.pickem.model.Game;
-import com.gci.pickem.model.WeekGames;
+import com.gci.pickem.model.GamesList;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -23,7 +23,7 @@ public class ScheduleControllerTest {
 
     @Test
     public void testGetGames() {
-        WeekGames gamesByWeekOfYear = scheduleController.getGamesByWeekOfYear(2016, 1);
+        GamesList gamesByWeekOfYear = scheduleController.getGamesByWeekOfYear(2016, 1);
 
         assertEquals(16, gamesByWeekOfYear.getGames().size());
 
@@ -33,7 +33,7 @@ public class ScheduleControllerTest {
         Assert.assertEquals("Broncos", game.getHomeTeam().getTeamName());
         Assert.assertEquals("Carolina", game.getAwayTeam().getCity());
         Assert.assertEquals("Panthers", game.getAwayTeam().getTeamName());
-        assertEquals(LocalDateTime.parse("2016-09-07T19:00", DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")), game.getGameTime());
+        assertEquals(LocalDateTime.parse("2016-09-08T20:30", DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")), game.getGameTime());
     }
 
     @Test(expected = MissingRequiredDataException.class)

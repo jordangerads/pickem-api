@@ -17,10 +17,10 @@ import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenCo
 @EnableAuthorizationServer
 public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdapter {
 
-    @Value("${security.jwt.client-id}")
+    @Value("${security.jwt.client-id:12345}")
     private String clientId;
 
-    @Value("${security.jwt.client-secret}")
+    @Value("${security.jwt.client-secret:67890}")
     private String clientSecret;
 
     @Value("${security.jwt.grant-type}")

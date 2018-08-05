@@ -17,6 +17,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Map;
 
 @RestController
 public class UserController {
@@ -51,10 +57,15 @@ public class UserController {
         return userView;
     }
 
-    @GetMapping("api/v1/user/sendEmail")
-    @PreAuthorize("hasAuthority('USER')")
-    public void sendEmail() {
-        pickService.notifyUsersWithoutPicks();
+    @PostMapping("api/v1/user/sendEmail")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public void sendEmail(@RequestBody Map<String, Long> input) {
+        Long epoch = input.get("epoch");
+        if (epoch == null) {
+            throw new RuntimeException("Required input 'epoch' is missing.");
+        }
+
+        pickService.notifyUsersWithoutPicks(LocalDate.from(Instant.ofEpochMilli(epoch).atZone(ZoneId.of("America/New_York"))));
     }
 
     @PostMapping("/api/v1/user/register")
@@ -87,5 +98,12 @@ public class UserController {
     @ResponseStatus(value = HttpStatus.NOT_FOUND)
     public void handleUserNotFound() {
         // Nothing to do.
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    @ResponseStatus(value = HttpStatus.BAD_REQUEST)
+    public void handleException(RuntimeException e, HttpServletResponse response) throws IOException {
+        log.error("Exception: {}", e.getMessage());
+        response.getOutputStream().write(e.getMessage().getBytes());
     }
 }

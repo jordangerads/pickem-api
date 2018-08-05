@@ -1,14 +1,13 @@
 package com.gci.pickem.service.pool;
 
 import com.gci.pickem.data.User;
+import com.gci.pickem.data.UserPool;
 import com.gci.pickem.exception.UserNotFoundException;
 import com.gci.pickem.model.PoolView;
 import com.gci.pickem.model.ScoringMethod;
 import com.gci.pickem.model.UserPoolRole;
 import com.gci.pickem.repository.UserPoolRepository;
 import com.gci.pickem.repository.UserRepository;
-import com.gci.pickem.data.UserPool;
-import com.gci.pickem.repository.PoolRepository;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +16,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.Set;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest
@@ -27,7 +26,6 @@ public class PoolServiceImplTest {
 
     @Autowired private UserRepository userRepository;
     @Autowired private UserPoolRepository userPoolRepository;
-    @Autowired private PoolRepository poolRepository;
 
     @Test(expected = UserNotFoundException.class)
     public void testCreatePoolForNonExistentUser() {

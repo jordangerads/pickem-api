@@ -1,11 +1,12 @@
 package com.gci.pickem.controller;
 
 import com.gci.pickem.exception.MissingRequiredDataException;
-import com.gci.pickem.model.WeekGames;
+import com.gci.pickem.model.GamesList;
 import com.gci.pickem.service.schedule.ScheduleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -21,7 +22,7 @@ public class ScheduleController {
     }
 
     @GetMapping("/api/v1/games/season/{year}/week/{weekNum}")
-    public WeekGames getGamesByWeekOfYear(@PathVariable("year") Integer year, @PathVariable("weekNum") Integer week) {
+    public GamesList getGamesByWeekOfYear(@PathVariable("year") Integer year, @PathVariable("weekNum") Integer week) {
         if (year == null) {
             throw new MissingRequiredDataException("Year must be provided");
         }

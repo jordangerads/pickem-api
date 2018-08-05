@@ -1,42 +1,36 @@
 package com.gci.pickem.service.schedule;
 
 import com.gci.pickem.data.Game;
+import com.gci.pickem.model.GamesList;
 import com.gci.pickem.model.TeamView;
-import com.gci.pickem.model.WeekGames;
-import com.gci.pickem.model.mysportsfeeds.FullGameSchedule;
-import com.gci.pickem.model.mysportsfeeds.GameEntry;
-import com.gci.pickem.model.mysportsfeeds.GameScore;
-import com.gci.pickem.model.mysportsfeeds.Team;
+import com.gci.pickem.model.mysportsfeeds.*;
 import com.gci.pickem.service.game.GamesService;
 import com.gci.pickem.service.mysportsfeeds.MySportsFeedsService;
 import com.gci.pickem.service.team.TeamService;
-import com.gci.pickem.util.SeasonUtil;
+import com.gci.pickem.util.ScheduleUtil;
 import org.apache.commons.collections4.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.transaction.Transactional;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 public class ScheduleServiceImpl implements ScheduleService {
+    private static final Logger log = LoggerFactory.getLogger(ScheduleServiceImpl.class);
 
     private MySportsFeedsService mySportsFeedsService;
     private TeamService teamService;
     private GamesService gamesService;
-
-    private static final Pattern GAME_TIME_PATTERN = Pattern.compile("(1?[0-9]):([0-5][0-9])([AP]M)");
 
     @Autowired
     ScheduleServiceImpl(
@@ -50,25 +44,108 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     @Override
-    public WeekGames getGamesForSeasonAndWeek(int season, int week) {
+    @Transactional
+    public void processExternalGamesForNextDays(int days) {
+        FullGameSchedule schedule = mySportsFeedsService.getGamesUntilDaysFromNow(days);
+
+        if (CollectionUtils.isNotEmpty(schedule.getGameEntries())) {
+            log.debug("Found {} games on today's schedule.", schedule.getGameEntries().size());
+            // Process the games if we don't already have them.
+            processExternalGames(schedule.getGameEntries());
+        } else {
+            log.debug("No scheduled games found for today.");
+        }
+    }
+
+    @Override
+    @Transactional
+    public GamesList getGamesForSeasonAndWeek(int season, int week) {
         Collection<Game> existingGames = gamesService.findAllBySeasonAndWeek(season, week);
         if (CollectionUtils.isEmpty(existingGames)) {
             // Games don't yet exist. Grab the data from MSF.
             FullGameSchedule schedule = mySportsFeedsService.getGamesForSeasonAndWeek(season, week);
 
-            // Add ALL of the games from the requested schedule to the database.
-            // Return only those for the requested week.
-            List<Game> newGames = processNewData(schedule.getGameEntries());
+            // Add ALL of the games from the requested schedule to the database. Return only those for the requested week.
+            List<Game> newGames = processExternalGames(schedule.getGameEntries());
+
             List<com.gci.pickem.model.Game> games =
                 newGames.stream()
-                    .filter(entry -> entry.getWeek().equals(week))
                     .map(this::getGameView)
                     .sorted(Comparator.comparing(com.gci.pickem.model.Game::getGameTime))
                     .collect(Collectors.toList());
 
-            return new WeekGames(games);
+            return new GamesList(games);
         } else {
-            return new WeekGames(existingGames.stream().map(this::getGameView).collect(Collectors.toList()));
+            return new GamesList(existingGames.stream().map(this::getGameView).collect(Collectors.toList()));
+        }
+    }
+
+    private Game getGameByExternalId(int externalId, int week, Instant date) {
+        Game game = gamesService.findByExternalId(externalId);
+        if (game == null) {
+            // We have a score, but not the actual game somehow... Request the week's games to fill in.
+            getGamesForSeasonAndWeek(ScheduleUtil.getSeasonForDate(date), week);
+
+            // Try to get it again.
+            game = gamesService.findByExternalId(externalId);
+            if (game == null) {
+                throw new RuntimeException(
+                        String.format("Unable to find game with external ID %d in database.", externalId));
+            }
+        }
+
+        return game;
+    }
+
+    @Override
+    @Transactional
+    public void processScoresForDate(Instant date) {
+        Scoreboard scoreboard = mySportsFeedsService.getFinalGameScores(date);
+        if (scoreboard == null || CollectionUtils.isEmpty(scoreboard.getGameScores())) {
+            log.info("No final scores found for date {}", date);
+            return;
+        }
+
+        List<GameScore> scores = scoreboard.getGameScores();
+        for (GameScore gameScore : scores) {
+            try {
+                GameEntry gameEntry = gameScore.getGame();
+                if (!"true".equalsIgnoreCase(gameScore.getIsCompleted())) {
+                    log.warn("Received non-complete game in response for game with external ID %d", gameEntry.getId());
+                    continue;
+                }
+
+                Game game = getGameByExternalId(gameEntry.getId(), gameEntry.getWeek(), date);
+                if (game.getWinningTeamId() != null) {
+                    // Game has already been processed. Nothing to do.
+                    continue;
+                }
+
+                int home = gameScore.getHomeScore();
+                int away = gameScore.getAwayScore();
+
+                if (home != away) {
+                    // There is a winner. Sad day.
+                    int winningTeamId =
+                        home > away ?
+                            gameEntry.getHomeTeam().getId() :
+                            gameEntry.getAwayTeam().getId();
+
+                    com.gci.pickem.data.Team team = teamService.findByExternalId((long) winningTeamId);
+                    if (team == null) {
+                        throw new RuntimeException(String.format("No team found for external ID %d", winningTeamId));
+                    }
+
+                    log.info("Game with ID {} is complete with winning team ID {}.", game.getGameId(), team.getTeamId());
+
+                    game.setWinningTeamId(team.getTeamId());
+                    game.setGameComplete(true);
+
+                    gamesService.saveGame(game);
+                }
+            } catch (Exception e) {
+                log.error("Error occurred while attempting to process game score: {}", e.getMessage());
+            }
         }
     }
 
@@ -76,15 +153,17 @@ public class ScheduleServiceImpl implements ScheduleService {
         com.gci.pickem.model.Game model = new com.gci.pickem.model.Game();
 
         model.setGameId(game.getGameId());
-        model.setGameTime(LocalDateTime.ofInstant(Instant.ofEpochMilli(game.getGameTimeEpoch()), ZoneId.of("America/New_York")));
-
+        model.setGameTimeEpoch(game.getGameTimeEpoch());
         model.setHomeTeam(new TeamView(teamService.findById(game.getHomeTeamId())));
         model.setAwayTeam(new TeamView(teamService.findById(game.getAwayTeamId())));
+
+        // TODO: remove this!
+        model.setGameTime(LocalDateTime.ofInstant(Instant.ofEpochMilli(game.getGameTimeEpoch()), ZoneId.of("America/New_York")));
 
         return model;
     }
 
-    private List<Game> processNewData(List<GameEntry> gameEntries) {
+    private List<Game> processExternalGames(List<GameEntry> gameEntries) {
         List<Game> games = new ArrayList<>();
 
         for (GameEntry entry : gameEntries) {
@@ -98,65 +177,17 @@ public class ScheduleServiceImpl implements ScheduleService {
         return games;
     }
 
-    private long getUtcGameTime(GameEntry gameEntry) {
-        String date = gameEntry.getDate();
-        String time = get24HourTime(gameEntry.getTime());
+    private Game convertGame(GameEntry entry) {
+        Game game = new Game();
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-
-        TemporalAccessor temporalAccessor = formatter.parse(String.format("%s %s", date, time));
-        LocalDateTime localDateTime = LocalDateTime.from(temporalAccessor);
-        ZonedDateTime zonedDateTime = ZonedDateTime.of(localDateTime, ZoneId.of("America/New_York"));
-        return Instant.from(zonedDateTime).toEpochMilli();
-    }
-
-    String get24HourTime(String time) {
-        Matcher m = GAME_TIME_PATTERN.matcher(time);
-        if (!m.matches()) {
-            throw new RuntimeException(String.format("Unexpected game time format: %s", time));
-        }
-
-        String militaryTime = "";
-
-        String hour = m.group(1);
-
-        String timeOfDay = m.group(3);
-        if ("PM".equals(timeOfDay) && !"12".equals(hour)) {
-            militaryTime += Integer.toString(Integer.parseInt(hour) + 12);
-        } else if ("AM".equals(timeOfDay) && "12".equals(hour)) {
-            militaryTime += "00";
-        } else {
-            Integer intHour = Integer.parseInt(hour);
-            if (intHour < 10) {
-                militaryTime += "0";
-            }
-
-            militaryTime += hour;
-        }
-
-        militaryTime += ":" + m.group(2);
-
-        return militaryTime;
-    }
-
-    private Game processGame(GameEntry entry) {
-        com.gci.pickem.data.Game game = gamesService.findByExternalId(entry.getId());
-
-        if (game != null) {
-            return game;
-        }
-
-        // Game isn't in the DB yet.
-        game = new com.gci.pickem.data.Game();
-
-        long gameTimeEpoch = getUtcGameTime(entry);
+        long gameTimeEpoch = ScheduleUtil.getUtcGameTime(entry);
         Instant gameTime = Instant.ofEpochMilli(gameTimeEpoch);
 
-        game.setSeason(SeasonUtil.getSeasonForDate(gameTime));
+        game.setSeason(ScheduleUtil.getSeasonForDate(gameTime));
         game.setWeek(entry.getWeek());
         game.setExternalId(entry.getId());
 
-        game.setGameTimeEpoch(getUtcGameTime(entry));
+        game.setGameTimeEpoch(gameTimeEpoch);
 
         com.gci.pickem.data.Team away = teamService.findByExternalId((long) entry.getAwayTeam().getId());
         game.setAwayTeamId(away.getTeamId());
@@ -165,10 +196,41 @@ public class ScheduleServiceImpl implements ScheduleService {
         game.setHomeTeamId(home.getTeamId());
 
         // Check if the game has been finalized.
-        GameScore score = mySportsFeedsService.getGameScore(gameTime, entry.getId());
-        game.setGameComplete(Boolean.valueOf(score.getIsCompleted()));
-        if (game.getGameComplete()) {
-            game.setWinningTeamId(score.getHomeScore().compareTo(score.getAwayScore()) > 0 ? home.getTeamId() : away.getTeamId());
+        try {
+            GameScore score = mySportsFeedsService.getGameScore(gameTime, entry.getId());
+            game.setGameComplete(Boolean.valueOf(score.getIsCompleted()));
+            if (game.getGameComplete()) {
+                game.setWinningTeamId(score.getHomeScore().compareTo(score.getAwayScore()) > 0 ? home.getTeamId() : away.getTeamId());
+            }
+        } catch (RuntimeException e) {
+            log.debug("No score found for game with external ID {}: {}", entry.getId(), e.getMessage());
+        }
+
+        return game;
+    }
+
+    private Game processGame(GameEntry entry) {
+        com.gci.pickem.data.Game game = gamesService.findByExternalId(entry.getId());
+
+        if (game != null) {
+            // It's possible the game has an updated schedule, we should process that too.
+            long existingEpoch = game.getGameTimeEpoch();
+            long entryEpoch = ScheduleUtil.getUtcGameTime(entry);
+
+            if (existingEpoch != entryEpoch) {
+                log.info("Game with ID {} has an updated game time. Was {}, updating to {}.", game.getGameId(), existingEpoch, entryEpoch);
+                if (existingEpoch > entryEpoch) {
+                    // Game was somehow rescheduled earlier. This could be a big problem.
+                    log.warn("Game with ID {} was rescheduled to an earlier time. This could be a concern for picks.");
+                }
+
+                game.setGameTimeEpoch(entryEpoch);
+            }
+
+            return game;
+        } else {
+            // Game isn't in the DB yet.
+            game = convertGame(entry);
         }
 
         // This needs to be transactional here!
