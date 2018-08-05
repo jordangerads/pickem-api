@@ -8,7 +8,7 @@ public interface ScheduleService {
 
     GamesList getGamesForSeasonAndWeek(int season, int week);
 
-    GamesList getGamesForNextDays(int days);
+    void processExternalGamesForNextDays(int days);
 
     void processScoresForDate(Instant date);
 }

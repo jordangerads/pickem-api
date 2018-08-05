@@ -4,10 +4,12 @@ import com.google.common.collect.ImmutableMap;
 import com.sendwithus.SendWithUs;
 import com.sendwithus.SendWithUsSendRequest;
 import com.sendwithus.exception.SendWithUsException;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -36,6 +38,7 @@ public class MailServiceImpl implements MailService {
     }
 
     @Override
+    @Async
     public void sendEmails(Collection<SendEmailRequest> requests) {
         for (SendEmailRequest request : requests) {
             sendEmail(request);
@@ -43,11 +46,18 @@ public class MailServiceImpl implements MailService {
     }
 
     @Override
+    @Async
     public void sendEmail(SendEmailRequest request) {
         SendWithUsSendRequest swuRequest = new SendWithUsSendRequest();
 
         swuRequest.setEmailId(request.getTemplateId());
-        swuRequest.setRecipient(ImmutableMap.of("name", request.getRecipientName(), "address", request.getRecipientEmail()));
+
+        if (StringUtils.isBlank(request.getRecipientName())) {
+            swuRequest.setRecipient(ImmutableMap.of("address", request.getRecipientEmail()));
+        } else {
+            swuRequest.setRecipient(ImmutableMap.of("name", request.getRecipientName(), "address", request.getRecipientEmail()));
+        }
+
         swuRequest.setEmailData(request.getRequestData());
 
         executorService.submit(new SendEmailRunnable(swuRequest));

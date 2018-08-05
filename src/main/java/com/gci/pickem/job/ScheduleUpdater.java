@@ -1,10 +1,6 @@
 package com.gci.pickem.job;
 
-import com.gci.pickem.data.Game;
-import com.gci.pickem.model.GamesList;
-import com.gci.pickem.service.game.GamesService;
 import com.gci.pickem.service.schedule.ScheduleService;
-import org.apache.commons.collections4.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,12 +14,10 @@ public class ScheduleUpdater {
     private static final Logger log = LoggerFactory.getLogger(ScheduleUpdater.class);
 
     private ScheduleService scheduleService;
-    private GamesService gamesService;
 
     @Autowired
-    ScheduleUpdater(ScheduleService scheduleService, GamesService gamesService) {
+    ScheduleUpdater(ScheduleService scheduleService) {
         this.scheduleService = scheduleService;
-        this.gamesService = gamesService;
     }
 
     // Run just after midnight of every day, eastern time.
@@ -31,38 +25,8 @@ public class ScheduleUpdater {
     public void updateFutureSchedules() {
         log.info("Executing schedule updates process.");
 
-        int updated = 0;
-
         // Look for all games in the next 7 days.
-        GamesList gamesForWeek = scheduleService.getGamesForNextDays(7);
-        if (CollectionUtils.isNotEmpty(gamesForWeek.getGames())) {
-            for (com.gci.pickem.model.Game game : gamesForWeek.getGames()) {
-                Game entity = gamesService.findById(game.getGameId());
-                if (entity == null) {
-                    // This is a major problem, we need to import this game since we don't have it.
-                    log.error("This is a major problem!");
-                    continue;
-                }
-
-                Long currentEpoch = entity.getGameTimeEpoch();
-                Long incomingEpoch = game.getGameTimeEpoch();
-
-                if (!currentEpoch.equals(incomingEpoch)) {
-                    log.info(
-                        "Game with ID {} has an updated epoch of {} (current stored value is {}). " +
-                        "Updating to newly received time.", entity.getGameId(), incomingEpoch, currentEpoch);
-                    updated++;
-                }
-
-                entity.setGameTimeEpoch(incomingEpoch);
-
-                gamesService.saveGame(entity);
-            }
-
-            log.info("Updated {} game epochs", updated);
-        } else {
-            log.warn("No games found for the next seven days. This should be concerning if the season is in progress!");
-        }
+        scheduleService.processExternalGamesForNextDays(7);
 
         log.info("Schedule process update complete.");
     }

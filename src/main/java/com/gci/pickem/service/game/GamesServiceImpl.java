@@ -4,7 +4,6 @@ import com.gci.pickem.data.Game;
 import com.gci.pickem.repository.GameRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
@@ -22,7 +21,6 @@ public class GamesServiceImpl implements GamesService {
     }
 
     @Override
-    @Transactional
     public Game findByExternalId(Integer externalId) {
        return gameRepository.findByExternalId(externalId);
     }
@@ -34,17 +32,7 @@ public class GamesServiceImpl implements GamesService {
     }
 
     @Override
-    public Game findById(Long id) {
-        return gameRepository.findOne(id);
-    }
-
-    @Override
     public Collection<Game> findAllBySeasonAndWeek(int season, int week) {
         return gameRepository.findAllBySeasonAndWeek(season, week);
-    }
-
-    @Override
-    public Game findGameAndFetchTeams(Long gameId) {
-        return gameRepository.findGameAndFetchTeams(gameId);
     }
 }

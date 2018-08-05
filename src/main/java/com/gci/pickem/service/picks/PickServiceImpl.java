@@ -14,6 +14,7 @@ import com.gci.pickem.service.mail.MailType;
 import com.gci.pickem.service.mail.SendEmailRequest;
 import com.gci.pickem.service.schedule.ScheduleService;
 import org.apache.commons.collections4.CollectionUtils;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -163,10 +164,14 @@ public class PickServiceImpl implements PickService {
             return;
         }
 
+        log.info("Looking for users who are missing any picks for the {} games today.", games.size());
+
         List<Long> gameIds = games.stream().map(Game::getGameId).collect(Collectors.toList());
 
         // Find all users in pools who haven't made picks for the given games
         Set<Object[]> usersMissingPicks = userRepository.getUsersWithMissingPicks(gameIds, gameIds.size());
+
+        log.info("Found {} user/pool combinations missing picks for today's games.");
 
         // This could get expensive later. Watch out.
         Map<Long, Pool> poolCache = new HashMap<>();
@@ -188,9 +193,8 @@ public class PickServiceImpl implements PickService {
                 request.setRecipientEmail(user.getEmail());
                 request.setTemplateId(MailType.PICKS_REMINDER.getTemplateId());
 
-                Map<String, Object> requestData = new HashMap<>();
-                requestData.put("poolName", pool.getPoolName());
-                requestData.put("firstName", user.getFirstName());
+                request.addRequestData("poolName", pool.getPoolName());
+                request.addRequestData("firstName", user.getFirstName());
 
                 Game game = games.get(0);
                 Set<Pick> picks = pickRepository.getPicks(userId, poolId, game.getSeason(), game.getWeek());
@@ -213,14 +217,14 @@ public class PickServiceImpl implements PickService {
 
                     missingGame.put("awayTeamName", needingPick.getAwayTeam().getTeamName());
                     missingGame.put("homeTeamName", needingPick.getHomeTeam().getTeamName());
-                    missingGame.put("gameTime", Instant.ofEpochSecond(needingPick.getGameTimeEpoch()).toString());
+                    missingGame.put("gameTime", Instant.ofEpochMilli(needingPick.getGameTimeEpoch()).toString());
 
                     missingGames.add(missingGame);
                 }
 
-                requestData.put("missingGames", missingGames);
+                request.addRequestData("missingGames", missingGames);
 
-                request.setRequestData(requestData);
+                log.debug(new ObjectMapper().writeValueAsString(request.getRequestData()));
 
                 requests.add(request);
             } catch (Exception e) {
@@ -229,8 +233,6 @@ public class PickServiceImpl implements PickService {
 
             mailService.sendEmails(requests);
         }
-
-        log.info("" + games.size());
     }
 
     private Pool getPool(Long poolId, Map<Long, Pool> cache) {

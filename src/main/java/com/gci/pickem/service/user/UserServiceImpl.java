@@ -14,7 +14,6 @@ import com.gci.pickem.repository.UserRoleRepository;
 import com.gci.pickem.service.mail.MailService;
 import com.gci.pickem.service.mail.MailType;
 import com.gci.pickem.service.mail.SendEmailRequest;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -24,7 +23,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -134,13 +132,9 @@ public class UserServiceImpl implements UserService {
         request.setRecipientEmail(user.getEmail());
         request.setRecipientName(user.getFirstName());
 
-        Map<String, Object> requestData =
-            ImmutableMap.of(
-                "nonce", nonce,
-                "firstName", user.getFirstName(),
-                "clientUrl", clientUrl);
-
-        request.setRequestData(requestData);
+        request.addRequestData("nonce", nonce);
+        request.addRequestData("firstName", user.getFirstName());
+        request.addRequestData("clientUrl", clientUrl);
 
         mailService.sendEmail(request);
     }

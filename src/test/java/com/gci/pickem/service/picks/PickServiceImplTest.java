@@ -332,7 +332,7 @@ public class PickServiceImplTest {
         first.getHomeTeam().setTeamName("Bears");
 
         LocalDateTime firstTime = LocalDateTime.of(2018, 7, 28, 12, 0, 0, 0);
-        first.setGameTimeEpoch(firstTime.atZone(ZoneId.of("America/New_York")).toInstant().getEpochSecond());
+        first.setGameTimeEpoch(firstTime.atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli());
 
         first.setHomeTeamId(2L);
         first.setGameId(1L);
@@ -348,7 +348,7 @@ public class PickServiceImplTest {
         second.getHomeTeam().setTeamName("Lions");
 
         LocalDateTime secondTime = LocalDateTime.of(2018, 7, 28, 17, 0, 0, 0);
-        second.setGameTimeEpoch(secondTime.atZone(ZoneId.of("America/New_York")).toInstant().getEpochSecond());
+        second.setGameTimeEpoch(secondTime.atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli());
 
         second.setAwayTeamId(3L);
         second.setHomeTeamId(4L);

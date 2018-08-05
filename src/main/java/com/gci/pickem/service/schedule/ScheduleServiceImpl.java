@@ -45,20 +45,16 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     @Transactional
-    public GamesList getGamesForNextDays(int days) {
+    public void processExternalGamesForNextDays(int days) {
         FullGameSchedule schedule = mySportsFeedsService.getGamesUntilDaysFromNow(days);
 
         if (CollectionUtils.isNotEmpty(schedule.getGameEntries())) {
             log.debug("Found {} games on today's schedule.", schedule.getGameEntries().size());
             // Process the games if we don't already have them.
-            List<Game> games = processNewData(schedule.getGameEntries());
-            return new GamesList(games.stream().map(this::getGameView).collect(Collectors.toList()));
+            processExternalGames(schedule.getGameEntries());
         } else {
             log.debug("No scheduled games found for today.");
         }
-
-        // No games today, nothing to check.
-        return new GamesList();
     }
 
     @Override
@@ -70,7 +66,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             FullGameSchedule schedule = mySportsFeedsService.getGamesForSeasonAndWeek(season, week);
 
             // Add ALL of the games from the requested schedule to the database. Return only those for the requested week.
-            List<Game> newGames = processNewData(schedule.getGameEntries());
+            List<Game> newGames = processExternalGames(schedule.getGameEntries());
 
             List<com.gci.pickem.model.Game> games =
                 newGames.stream()
@@ -167,7 +163,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         return model;
     }
 
-    private List<Game> processNewData(List<GameEntry> gameEntries) {
+    private List<Game> processExternalGames(List<GameEntry> gameEntries) {
         List<Game> games = new ArrayList<>();
 
         for (GameEntry entry : gameEntries) {
@@ -181,15 +177,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         return games;
     }
 
-    private Game processGame(GameEntry entry) {
-        com.gci.pickem.data.Game game = gamesService.findByExternalId(entry.getId());
-
-        if (game != null) {
-            return game;
-        }
-
-        // Game isn't in the DB yet.
-        game = new Game();
+    private Game convertGame(GameEntry entry) {
+        Game game = new Game();
 
         long gameTimeEpoch = ScheduleUtil.getUtcGameTime(entry);
         Instant gameTime = Instant.ofEpochMilli(gameTimeEpoch);
@@ -215,6 +204,33 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
         } catch (RuntimeException e) {
             log.debug("No score found for game with external ID {}: {}", entry.getId(), e.getMessage());
+        }
+
+        return game;
+    }
+
+    private Game processGame(GameEntry entry) {
+        com.gci.pickem.data.Game game = gamesService.findByExternalId(entry.getId());
+
+        if (game != null) {
+            // It's possible the game has an updated schedule, we should process that too.
+            long existingEpoch = game.getGameTimeEpoch();
+            long entryEpoch = ScheduleUtil.getUtcGameTime(entry);
+
+            if (existingEpoch != entryEpoch) {
+                log.info("Game with ID {} has an updated game time. Was {}, updating to {}.", game.getGameId(), existingEpoch, entryEpoch);
+                if (existingEpoch > entryEpoch) {
+                    // Game was somehow rescheduled earlier. This could be a big problem.
+                    log.warn("Game with ID {} was rescheduled to an earlier time. This could be a concern for picks.");
+                }
+
+                game.setGameTimeEpoch(entryEpoch);
+            }
+
+            return game;
+        } else {
+            // Game isn't in the DB yet.
+            game = convertGame(entry);
         }
 
         // This needs to be transactional here!
