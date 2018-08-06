@@ -5,10 +5,7 @@ import com.gci.pickem.data.PoolInvite;
 import com.gci.pickem.data.User;
 import com.gci.pickem.data.UserPool;
 import com.gci.pickem.exception.UserNotFoundException;
-import com.gci.pickem.model.PoolInviteStatus;
-import com.gci.pickem.model.PoolInviteView;
-import com.gci.pickem.model.PoolView;
-import com.gci.pickem.model.UserPoolRole;
+import com.gci.pickem.model.*;
 import com.gci.pickem.repository.PoolInviteRepository;
 import com.gci.pickem.repository.PoolRepository;
 import com.gci.pickem.repository.UserPoolRepository;
@@ -16,13 +13,17 @@ import com.gci.pickem.repository.UserRepository;
 import com.gci.pickem.service.mail.MailService;
 import com.gci.pickem.service.mail.MailType;
 import com.gci.pickem.service.mail.SendEmailRequest;
+import org.apache.commons.collections4.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -77,6 +78,9 @@ public class PoolServiceImpl implements PoolService {
     @Override
     public void processPoolInviteResponse(long userId, long poolId, String inviteAction) {
         User user = userRepository.findOne(userId);
+        if (user == null) {
+            throw new UserNotFoundException(String.format("No user found for user ID %d", userId));
+        }
 
         Optional<UserPool> userPool = user.getUserPools().stream().filter(item -> item.getPoolId().equals(poolId)).findFirst();
         if (userPool.isPresent()) {
@@ -165,6 +169,56 @@ public class PoolServiceImpl implements PoolService {
         }
 
         return errorEmails;
+    }
+
+    @Override
+    public List<UserPoolView> getPoolsForUser(long userId) {
+        Set<UserPool> userPools = userPoolRepository.findByUserId(userId);
+        if (CollectionUtils.isEmpty(userPools)) {
+            return new ArrayList<>();
+        }
+
+        return
+            userPools.stream()
+                .map(userPool -> {
+                    UserPoolView userPoolView = new UserPoolView();
+
+                    userPoolView.setPoolId(userPool.getPoolId());
+                    userPoolView.setPoolName(userPool.getPool().getPoolName());
+                    userPoolView.setUserRole(userPool.getUserRole());
+                    userPoolView.setUserId(userId);
+
+                    return userPoolView;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void sendPoolMessage(long userId, long poolId, String message) {
+        validateUserIsPoolAdmin(userId, poolId);
+
+        User admin = userRepository.findOne(userId);
+
+        Set<User> poolUsers = userRepository.findAllByPoolId(poolId);
+
+        List<SendEmailRequest> messageRequests = new ArrayList<>();
+        poolUsers.forEach(user -> messageRequests.add(createPoolMessageRequest(user, admin, message)));
+
+        mailService.sendEmails(messageRequests);
+    }
+
+    private SendEmailRequest createPoolMessageRequest(User recipient, User sender, String message) {
+        SendEmailRequest request = new SendEmailRequest();
+
+        request.setRecipientName(recipient.getFirstName());
+        request.setRecipientEmail(recipient.getEmail());
+        request.setTemplateId(MailType.ADMIN_POOL_MESSAGE.getTemplateId());
+
+        request.addRequestData("message", message);
+        request.addRequestData("adminFirstName", sender.getFirstName());
+        request.addRequestData("adminLastName", sender.getLastName());
+
+        return request;
     }
 
     private void validateUserIsPoolAdmin(long userId, long poolId) {

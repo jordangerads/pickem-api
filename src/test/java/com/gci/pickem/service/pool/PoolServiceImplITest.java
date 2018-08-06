@@ -3,6 +3,7 @@ package com.gci.pickem.service.pool;
 import com.gci.pickem.data.User;
 import com.gci.pickem.data.UserPool;
 import com.gci.pickem.exception.UserNotFoundException;
+import com.gci.pickem.model.PoolInviteStatus;
 import com.gci.pickem.model.PoolView;
 import com.gci.pickem.model.ScoringMethod;
 import com.gci.pickem.model.UserPoolRole;
@@ -13,6 +14,7 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 
@@ -20,7 +22,7 @@ import static org.junit.Assert.assertEquals;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest
-public class PoolServiceImplTest {
+public class PoolServiceImplITest {
 
     @Autowired private PoolService poolService;
 
@@ -33,6 +35,7 @@ public class PoolServiceImplTest {
     }
 
     @Test
+    @Transactional
     public void testCreatePool() {
         String expectedName = "Test Pool Name";
         ScoringMethod scoringMethod = ScoringMethod.ABSOLUTE;
@@ -59,5 +62,10 @@ public class PoolServiceImplTest {
         UserPool userPool = userPools.iterator().next();
         assertEquals(user.getUserId(), userPool.getUserId());
         assertEquals(UserPoolRole.ADMIN.name(), userPool.getUserRole());
+    }
+
+    @Test(expected = UserNotFoundException.class)
+    public void testProcessPoolInviteResponse() {
+        poolService.processPoolInviteResponse(-1, 0, PoolInviteStatus.ACCEPTED.name());
     }
 }

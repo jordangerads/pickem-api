@@ -2,6 +2,7 @@ package com.gci.pickem.service.pool;
 
 import com.gci.pickem.model.PoolInviteView;
 import com.gci.pickem.model.PoolView;
+import com.gci.pickem.model.UserPoolView;
 
 import java.util.List;
 
@@ -17,4 +18,8 @@ public interface PoolService {
     List<PoolInviteView> getPoolInvitesForPool(long userId, long poolId);
 
     List<PoolInviteView> getPoolInvitesForUser(long userId);
+
+    List<UserPoolView> getPoolsForUser(long userId);
+
+    void sendPoolMessage(long userId, long poolId, String message);
 }

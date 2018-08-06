@@ -21,4 +21,6 @@ public interface PickRepository extends CrudRepository<Pick, Long> {
                        @Param("poolId") long poolId,
                        @Param("season") int season,
                        @Param("week") int week);
+
+    Pick getPickByUserIdAndPoolIdAndGameId(long userId, long poolId, long gameId);
 }

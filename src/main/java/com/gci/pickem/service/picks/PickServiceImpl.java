@@ -2,13 +2,13 @@ package com.gci.pickem.service.picks;
 
 import com.gci.pickem.data.*;
 import com.gci.pickem.model.GamePick;
-import com.gci.pickem.model.UserPicksRequest;
 import com.gci.pickem.model.GamesList;
-import com.gci.pickem.repository.GameRepository;
-import com.gci.pickem.repository.UserRepository;
 import com.gci.pickem.model.ScoringMethod;
+import com.gci.pickem.model.UserPicksRequest;
+import com.gci.pickem.repository.GameRepository;
 import com.gci.pickem.repository.PickRepository;
 import com.gci.pickem.repository.PoolRepository;
+import com.gci.pickem.repository.UserRepository;
 import com.gci.pickem.service.mail.MailService;
 import com.gci.pickem.service.mail.MailType;
 import com.gci.pickem.service.mail.SendEmailRequest;
@@ -55,8 +55,8 @@ public class PickServiceImpl implements PickService {
     }
 
     @Override
-    public PickSubmissionResponse saveUserPicks(UserPicksRequest request) {
-        if (request == null || request.getUserId() == null || request.getPoolId() == null ||
+    public PickSubmissionResponse saveUserPicks(long userId, UserPicksRequest request) {
+        if (request == null || request.getPoolId() == null ||
             CollectionUtils.isEmpty(request.getGamePicks())) {
             String msg = "Insufficient information received to record picks for user.";
             log.info(msg);
@@ -65,8 +65,8 @@ public class PickServiceImpl implements PickService {
 
         List<GamePick> picks = request.getGamePicks();
 
-        validateUserValidForPool(request.getUserId(), request.getPoolId());
-        Map<Long, PickInvalidityReason> validityResults = validateGames(picks);
+        validateUserValidForPool(userId, request.getPoolId());
+        Map<Long, PickInvalidityReason> validityResults = validateGames(userId, request.getPoolId(), picks);
         if (!validityResults.isEmpty()) {
             // There are some invalid picks in the submission.
             return new PickSubmissionResponse(validityResults);
@@ -78,7 +78,7 @@ public class PickServiceImpl implements PickService {
         int season = getSeason(picks);
         int week = getWeek(picks);
 
-        Set<Pick> existingPicks = pickRepository.getPicks(request.getUserId(), request.getPoolId(), season, week);
+        Set<Pick> existingPicks = pickRepository.getPicks(userId, request.getPoolId(), season, week);
         if (CollectionUtils.isEmpty(existingPicks)) {
             // User has not saved any picks for this season/week/pool yet. Make all new ones.
             List<Pick> toCreate =
@@ -86,7 +86,7 @@ public class PickServiceImpl implements PickService {
                     .map(gamePick -> {
                         Pick pick = new Pick();
 
-                        pick.setUserId(request.getUserId());
+                        pick.setUserId(userId);
                         pick.setPoolId(request.getPoolId());
                         pick.setGameId(gamePick.getGameId());
                         pick.setConfidence(gamePick.getConfidence());
@@ -112,7 +112,28 @@ public class PickServiceImpl implements PickService {
     }
 
     @Override
-    public List<Integer> getConfidenceValues(Long poolId, Integer season, Integer week) {
+    public List<GamePick> getUserPicks(long userId, long poolId, int season, int week) {
+        Set<Pick> picks = pickRepository.getPicks(userId, poolId, season, week);
+        if (CollectionUtils.isEmpty(picks)) {
+            return new ArrayList<>();
+        }
+
+        return
+            picks.stream()
+                .map(pick -> {
+                    GamePick gamePick = new GamePick();
+
+                    gamePick.setGameId(pick.getGameId());
+                    gamePick.setConfidence(pick.getConfidence());
+                    gamePick.setChosenTeamId(pick.getChosenTeamId());
+
+                    return gamePick;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Integer> getConfidenceValues(long poolId, int season, int week) {
         Pool pool = poolRepository.findOne(poolId);
         if (pool == null) {
             throw new RuntimeException(String.format("No pool found for poolId %d", poolId));
@@ -332,7 +353,7 @@ public class PickServiceImpl implements PickService {
      * Ensure that the correct number of games are provided in the picks and that all picks
      * span just one week.
      */
-    Map<Long, PickInvalidityReason> validateGames(List<GamePick> picks) {
+    Map<Long, PickInvalidityReason> validateGames(long userId, long poolId, List<GamePick> picks) {
         Set<Long> gameIds = picks.stream().map(GamePick::getGameId).collect(Collectors.toSet());
 
         if (gameIds.size() != picks.size()) {
@@ -376,11 +397,41 @@ public class PickServiceImpl implements PickService {
 
             Instant now = Instant.now();
             if (Instant.ofEpochMilli(theGame.getGameTimeEpoch()).isBefore(now)) {
-                log.warn("Non-zero confidence pick made for in-progress game with ID {}", gamePick.getGameId());
-                invalidityReasons.put(gamePick.getGameId(), PickInvalidityReason.GAME_STARTED);
+                Pick existingPick = pickRepository.getPickByUserIdAndPoolIdAndGameId(userId, poolId, theGame.getGameId());
+                if (!isPickValidForGameInProgress(existingPick, gamePick)) {
+                    // The user submitted
+                    log.warn("Invalid submission of pick or change to existing pick made for in-progress game with ID {}", gamePick.getGameId());
+                    invalidityReasons.put(gamePick.getGameId(), PickInvalidityReason.GAME_STARTED);
+                }
             }
         }
 
         return invalidityReasons;
+    }
+
+    private boolean isPickValidForGameInProgress(Pick existingPick, GamePick incomingPick) {
+        if (existingPick == null) {
+            return incomingPick.getChosenTeamId() == null && incomingPick.getConfidence() == null;
+        } else {
+            // There is an existing pick. The confidences and teams better match!
+            if ((existingPick.getChosenTeamId() == null) != (incomingPick.getChosenTeamId() == null)) {
+                // One is null, but the other isn't. Doesn't matter which is which, this isn't allowed.
+                return false;
+            } else if (existingPick.getChosenTeamId() != null) {
+                if (!existingPick.getChosenTeamId().equals(incomingPick.getChosenTeamId())) {
+                    // Both values are non-null, but their values don't match. Not okay.
+                    return false;
+                }
+            }
+
+            if ((existingPick.getConfidence() == null) != (incomingPick.getConfidence() == null)) {
+                // One is null, but the other isn't. Doesn't matter which is which, this isn't allowed.
+                return false;
+            } else if (existingPick.getConfidence() != null) {
+                return existingPick.getConfidence().equals(incomingPick.getConfidence());
+            }
+        }
+
+        return true;
     }
 }

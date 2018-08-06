@@ -1,9 +1,7 @@
 package com.gci.pickem.controller;
 
-import com.gci.pickem.exception.UserNotFoundException;
 import com.gci.pickem.model.*;
 import com.gci.pickem.service.pool.PoolService;
-import com.gci.pickem.service.user.UserService;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,20 +16,19 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import static com.gci.pickem.util.RequestUtil.getRequestUser;
+
 @RestController
 public class PoolController {
     private static final Logger log = LoggerFactory.getLogger(PoolController.class);
 
     private PoolService poolService;
-    private UserService userService;
 
     @Autowired
     PoolController(
-        PoolService poolService,
-        UserService userService
+        PoolService poolService
     ) {
         this.poolService = poolService;
-        this.userService = userService;
     }
 
     // In the future, we will be able to get the creator of the pool and stuff from the authentication object.
@@ -61,6 +58,13 @@ public class PoolController {
         return poolService.getPoolInvitesForPool(user.getId(), poolId);
     }
 
+    @GetMapping("/api/v1/pool/list")
+    public List<UserPoolView> getUserPools(HttpServletRequest request) {
+        UserView user = getRequestUser(request);
+
+        return poolService.getPoolsForUser(user.getId());
+    }
+
     @GetMapping("/api/v1/pool/invite")
     @PreAuthorize("hasAuthority('USER')")
     public List<PoolInviteView> getPoolInvitesForUser(HttpServletRequest request) {
@@ -81,14 +85,11 @@ public class PoolController {
                 inviteRequest.getClientUrl()));
     }
 
-    private UserView getRequestUser(HttpServletRequest request) {
-        UserView user = userService.getUserByUsername(request.getUserPrincipal().getName());
-        if (user == null) {
-            throw new UserNotFoundException(
-                    String.format("No user found with username %s", request.getUserPrincipal().getName()));
-        }
-
-        return user;
+    @PostMapping("/api/v1/pool/{id}/message")
+    @PreAuthorize("hasAuthority('USER')")
+    public void sendPoolMessage(@PathVariable("id") Long poolId, @RequestBody PoolMessageRequest messageRequest, HttpServletRequest request) {
+        UserView user = getRequestUser(request);
+        poolService.sendPoolMessage(user.getId(), poolId, messageRequest.getMessage());
     }
 
     @ExceptionHandler(RuntimeException.class)

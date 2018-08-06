@@ -16,6 +16,15 @@ public interface UserRepository extends CrudRepository<User, Long> {
 
     @Query(
         value =
+            "SELECT u.*" +
+            "FROM users u " +
+            "JOIN user_pool up ON u.user_id = up.user_id " +
+            "WHERE up.pool_id = ?1",
+        nativeQuery = true)
+    Set<User> findAllByPoolId(Long poolId);
+
+    @Query(
+        value =
             "(select user_id, pool_id from user_pool) " +
             "except " +
             "(select user_id, pool_id " +
