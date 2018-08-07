@@ -22,7 +22,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -97,7 +96,7 @@ public class PickServiceImplTest {
         picks.add(getGamePick(1L, 1L, 16));
         picks.add(getGamePick(1L, 1L, 15));
 
-        service.validateGames(picks);
+        service.validateGames(1L, 1L, picks);
     }
 
     @Test(expected = RuntimeException.class)
@@ -107,7 +106,7 @@ public class PickServiceImplTest {
         picks.add(getGamePick(1L, 1L, 16));
         picks.add(getGamePick(17L, 1L, 15));
 
-        service.validateGames(picks);
+        service.validateGames(1L, 1L, picks);
     }
 
     @Test(expected = RuntimeException.class)
@@ -117,7 +116,7 @@ public class PickServiceImplTest {
         picks.add(getGamePick(1L, 1L, 16));
         picks.add(getGamePick(2L, 2L, 15));
 
-        service.validateGames(picks);
+        service.validateGames(1L, 1L, picks);
     }
 
     @Test(expected = RuntimeException.class)
@@ -141,7 +140,7 @@ public class PickServiceImplTest {
         picks.add(getGamePick(15L, null, 2)); // throw in a non-pick
         picks.add(getGamePick(16L, 1L, 1));
 
-        service.validateGames(picks);
+        service.validateGames(1L, 1L, picks);
     }
 
     @Test(expected = RuntimeException.class)
@@ -165,7 +164,7 @@ public class PickServiceImplTest {
         picks.add(getGamePick(15L, 15L, 2));
         picks.add(getGamePick(null, 1L, 1));
 
-        service.validateGames(picks);
+        service.validateGames(1L, 1L, picks);
     }
 
     @Test

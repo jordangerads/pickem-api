@@ -59,8 +59,6 @@ public class PoolServiceImpl implements PoolService {
             throw new UserNotFoundException(String.format("No user exists with ID %d", userId));
         }
 
-        // TODO: Validate that the user creating the pool has "rights" to create a pool. Paying member, etc.
-
         // Create the pool.
         Pool pool = poolRepository.save(new Pool(poolView));
 
@@ -116,6 +114,7 @@ public class PoolServiceImpl implements PoolService {
     }
 
     @Override
+    @Transactional
     public List<PoolInviteView> getPoolInvitesForPool(long userId, long poolId) {
         // Only allow pool invites to be seen by pool admins.
         validateUserIsPoolAdmin(userId, poolId);
@@ -223,6 +222,9 @@ public class PoolServiceImpl implements PoolService {
 
     private void validateUserIsPoolAdmin(long userId, long poolId) {
         Set<UserPool> userPools = userPoolRepository.findByUserId(userId);
+        if (CollectionUtils.isEmpty(userPools)) {
+            throw new RuntimeException(String.format("No pools found for user with ID %d", userId));
+        }
 
         Optional<UserPool> result =
             userPools.stream()

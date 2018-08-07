@@ -3,11 +3,15 @@ package com.gci.pickem.data;
 import com.gci.pickem.model.UserView;
 
 import javax.persistence.*;
+import java.io.Serializable;
 import java.util.Set;
 
+/*
+ * This shouldn't have to implement Serializable!! https://hibernate.atlassian.net/browse/HHH-7668
+ */
 @Entity
 @Table(name = "users")
-public class User {
+public class User implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

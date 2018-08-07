@@ -25,11 +25,15 @@ public class PoolInvite {
     @Column(name = "invite_status")
     private String inviteStatus = PoolInviteStatus.PENDING.name();
 
-    @OneToOne
+    @ManyToOne
     @JoinColumn(name = "inviting_user_id", referencedColumnName = "user_id", insertable = false, updatable = false)
-    private User user;
+    private User invitingUser;
 
-    @OneToOne
+    @ManyToOne
+    @JoinColumn(name = "invitee_email", referencedColumnName = "email", insertable = false, updatable = false)
+    private User invitedUser;
+
+    @ManyToOne
     @JoinColumn(name = "pool_id", referencedColumnName = "pool_id", insertable = false, updatable = false)
     private Pool pool;
 
@@ -73,12 +77,20 @@ public class PoolInvite {
         this.inviteStatus = inviteStatus;
     }
 
-    public User getUser() {
-        return user;
+    public User getInvitingUser() {
+        return invitingUser;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setInvitingUser(User invitingUser) {
+        this.invitingUser = invitingUser;
+    }
+
+    public User getInvitedUser() {
+        return invitedUser;
+    }
+
+    public void setInvitedUser(User invitedUser) {
+        this.invitedUser = invitedUser;
     }
 
     public Pool getPool() {
